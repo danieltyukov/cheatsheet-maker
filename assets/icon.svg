@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2B90D9"/>
+      <stop offset="100%" stop-color="#1565C0"/>
+    </linearGradient>
+  </defs>
+  <!-- Page background -->
+  <rect x="24" y="16" width="208" height="224" rx="12" fill="url(#g1)"/>
+  <rect x="36" y="28" width="184" height="200" rx="8" fill="#FFFFFF"/>
+  <!-- Image placeholder rectangles -->
+  <rect x="52" y="44" width="116" height="72" rx="6" fill="#E3F2FD" stroke="#1976D2" stroke-width="3"/>
+  <path d="M56 108l28-24 18 16 20-22 22 30H56z" fill="#90CAF9"/>
+  <circle cx="154" cy="64" r="10" fill="#64B5F6"/>
+  <rect x="52" y="134" width="152" height="72" rx="6" fill="#E8F5E9" stroke="#2E7D32" stroke-width="3"/>
+  <path d="M56 198l30-26 18 14 22-16 24 28H56z" fill="#A5D6A7"/>
+  <!-- Crop handles around top image -->
+  <g stroke="#1E88E5" stroke-width="3" fill="#FFFFFF">
+    <rect x="48" y="40" width="10" height="10" rx="2"/>
+    <rect x="110" y="40" width="10" height="10" rx="2"/>
+    <rect x="164" y="40" width="10" height="10" rx="2"/>
+    <rect x="48" y="106" width="10" height="10" rx="2"/>
+    <rect x="164" y="106" width="10" height="10" rx="2"/>
+  </g>
+  <!-- App mark -->
+  <rect x="176" y="188" width="44" height="32" rx="6" fill="#1976D2"/>
+  <path d="M184 196h28v4h-28zm0 10h28v4h-28zm0 10h18v4h-18z" fill="#FFFFFF"/>
+</svg>
