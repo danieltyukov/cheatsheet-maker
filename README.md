@@ -26,8 +26,3 @@ sudo apt install -y build-essential make pkg-config \
 ```
 
 That’s it. Go make pretty PDFs 🤌
-
----
-## License
-
-MIT
