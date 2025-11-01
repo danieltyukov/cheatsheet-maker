@@ -1,5 +1,3 @@
-![Mfw I finally make a PDF](assets/logo.png)
-
 # Cheatsheet Maker
 
 > Paste. Plop. Crop. PDF. (C go brrr)
