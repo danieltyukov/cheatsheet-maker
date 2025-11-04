@@ -27,6 +27,10 @@ static void update_page_label(AppState *st) {
     g_free(txt);
 }
 
+// Forward declarations
+static void on_undo_stroke(GtkWidget *btn, gpointer u);
+static void on_clear_strokes(GtkWidget *btn, gpointer u);
+
 static void autosave_document(AppState *st) {
     if (!st->doc || !st->autosave_path) return;
     GError *error = NULL;
@@ -179,6 +183,7 @@ static gboolean on_key_press(GtkWidget *w, GdkEventKey *ev, gpointer user_data) 
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_plus) { cheat_canvas_zoom_in(st->canvas); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_minus) { cheat_canvas_zoom_out(st->canvas); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_0) { cheat_canvas_zoom_reset(st->canvas); return TRUE; }
+    if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_z) { on_undo_stroke(NULL, st); return TRUE; }
     if (key == GDK_KEY_Delete || key == GDK_KEY_BackSpace) { cheat_canvas_delete_selection(st->canvas); return TRUE; }
     if (key == GDK_KEY_c || key == GDK_KEY_C) { cheat_canvas_toggle_crop_mode(st->canvas); return TRUE; }
     if (key == GDK_KEY_d || key == GDK_KEY_D) { 
@@ -255,6 +260,22 @@ static void on_width_changed(GtkSpinButton *btn, gpointer u) {
     cheat_canvas_set_draw_width(st->canvas, width);
 }
 
+static void on_undo_stroke(GtkWidget *btn, gpointer u) {
+    (void)btn;
+    AppState *st = (AppState*)u;
+    if (!st || !st->canvas) return;
+    cheat_canvas_undo_last_stroke(st->canvas);
+    autosave_document(st);
+}
+
+static void on_clear_strokes(GtkWidget *btn, gpointer u) {
+    (void)btn;
+    AppState *st = (AppState*)u;
+    if (!st || !st->canvas) return;
+    cheat_canvas_clear_all_strokes(st->canvas);
+    autosave_document(st);
+}
+
 static void activate(GtkApplication* app, gpointer user_data) {
     (void)user_data;
     AppState *st = g_new0(AppState, 1);
@@ -328,6 +349,17 @@ static void activate(GtkApplication* app, gpointer user_data) {
     gtk_widget_set_tooltip_text(st->width_spin, "Stroke Width");
     g_signal_connect(st->width_spin, "value-changed", G_CALLBACK(on_width_changed), st);
     gtk_box_pack_start(GTK_BOX(toolbar), st->width_spin, FALSE, FALSE, 4);
+
+    // Undo and clear buttons for drawings
+    GtkWidget *btn_undo = gtk_button_new_with_label("Undo Stroke");
+    gtk_widget_set_tooltip_text(btn_undo, "Undo last drawing stroke (Ctrl+Z)");
+    g_signal_connect(btn_undo, "clicked", G_CALLBACK(on_undo_stroke), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), btn_undo, FALSE, FALSE, 4);
+
+    GtkWidget *btn_clear = gtk_button_new_with_label("Clear Drawings");
+    gtk_widget_set_tooltip_text(btn_clear, "Clear all drawings on current page");
+    g_signal_connect(btn_clear, "clicked", G_CALLBACK(on_clear_strokes), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), btn_clear, FALSE, FALSE, 4);
 
     GtkWidget *btn_export = gtk_button_new_with_label("Export PDF");
     g_signal_connect(btn_export, "clicked", G_CALLBACK(on_action_export_pdf), st);

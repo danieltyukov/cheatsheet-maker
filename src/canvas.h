@@ -19,6 +19,8 @@ void cheat_canvas_toggle_crop_mode(CheatCanvas *self);
 void cheat_canvas_toggle_draw_mode(CheatCanvas *self);
 void cheat_canvas_set_draw_color(CheatCanvas *self, double r, double g, double b, double a);
 void cheat_canvas_set_draw_width(CheatCanvas *self, double width);
+void cheat_canvas_undo_last_stroke(CheatCanvas *self);
+void cheat_canvas_clear_all_strokes(CheatCanvas *self);
 
 // Add an image to the current page centered; takes ownership reference of pixbuf
 void cheat_canvas_add_pixbuf(CheatCanvas *self, GdkPixbuf *pixbuf);

@@ -42,6 +42,7 @@ sudo apt install -y build-essential make pkg-config \
 - `Ctrl+V` - Paste from clipboard
 - `Ctrl+O` - Import image file
 - `Ctrl+E` - Export to PDF
+- `Ctrl+Z` - Undo last drawing stroke
 - `Delete/Backspace` - Delete selected item
 - `C` - Toggle crop mode
 - `D` - Toggle draw mode
@@ -56,6 +57,8 @@ Press `D` or click the **Draw** button to enter drawing mode. In this mode:
 - Click and drag to draw freehand strokes
 - Use the color picker to change drawing color (supports transparency)
 - Adjust stroke width with the spinner (0.5 to 20 points)
+- **Undo Stroke** button or `Ctrl+Z` to remove the last stroke
+- **Clear Drawings** button to remove all drawings from the current page
 - Drawings are saved with your document and exported to PDF
 - Press `D` again to exit drawing mode and return to image manipulation
 

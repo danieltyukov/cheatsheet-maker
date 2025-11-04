@@ -115,6 +115,27 @@ void cheat_canvas_set_draw_width(CheatCanvas *self, double width) {
     self->draw_width = width;
 }
 
+void cheat_canvas_undo_last_stroke(CheatCanvas *self) {
+    if (!self->doc) return;
+    Page *p = document_current_page(self->doc);
+    if (!p->strokes) return;
+    
+    // Remove the last stroke
+    GList *last = g_list_last(p->strokes);
+    if (last) {
+        stroke_free((Stroke*)last->data);
+        p->strokes = g_list_delete_link(p->strokes, last);
+        cheat_canvas_queue_redraw(self);
+    }
+}
+
+void cheat_canvas_clear_all_strokes(CheatCanvas *self) {
+    if (!self->doc) return;
+    Page *p = document_current_page(self->doc);
+    page_clear_strokes(p);
+    cheat_canvas_queue_redraw(self);
+}
+
 static void canvas_add_item_centered(CheatCanvas *self, ImageItem *it) {
     Page *p = document_current_page(self->doc);
     page_add_item(p, it);
