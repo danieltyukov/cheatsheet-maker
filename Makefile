@@ -6,8 +6,8 @@ OBJ_DIR=build
 SRCS=$(wildcard $(SRC_DIR)/*.c)
 OBJS=$(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 CC=gcc
-CFLAGS=-O2 -Wall -Wextra -std=c11 $(shell pkg-config --cflags gtk+-3.0 gdk-pixbuf-2.0 cairo)
-LDFLAGS=$(shell pkg-config --libs gtk+-3.0 gdk-pixbuf-2.0 cairo) -lm
+CFLAGS=-O2 -Wall -Wextra -std=c11 $(shell pkg-config --cflags gtk+-3.0 gdk-pixbuf-2.0 cairo json-glib-1.0)
+LDFLAGS=$(shell pkg-config --libs gtk+-3.0 gdk-pixbuf-2.0 cairo json-glib-1.0) -lm
 
 all: $(APP_NAME)
 

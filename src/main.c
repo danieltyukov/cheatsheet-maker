@@ -3,6 +3,7 @@
 #include "canvas.h"
 #include "image_io.h"
 #include "pdf_export.h"
+#include "serialize.h"
 
 typedef struct AppState {
     GtkApplication *app;
@@ -10,6 +11,8 @@ typedef struct AppState {
     CheatCanvas *canvas;
     Document *doc;
     GtkWidget *page_label;
+    guint autosave_timer_id;
+    gchar *autosave_path;
 } AppState;
 
 static void update_page_label(AppState *st) {
@@ -21,13 +24,35 @@ static void update_page_label(AppState *st) {
     g_free(txt);
 }
 
+static void autosave_document(AppState *st) {
+    if (!st->doc || !st->autosave_path) return;
+    GError *error = NULL;
+    if (!document_save_to_file(st->doc, st->autosave_path, &error)) {
+        g_warning("Auto-save failed: %s", error ? error->message : "unknown error");
+        if (error) g_error_free(error);
+    }
+}
+
+static gboolean autosave_timer_callback(gpointer user_data) {
+    AppState *st = (AppState*)user_data;
+    autosave_document(st);
+    return G_SOURCE_CONTINUE; // Keep timer running
+}
+
 static void on_action_new(GtkWidget *btn, gpointer user_data) {
     (void)btn;
     AppState *st = (AppState*)user_data;
+    
+    // Auto-save current document before creating new one
+    autosave_document(st);
+    
     if (st->doc) document_free(st->doc);
     st->doc = document_new();
     cheat_canvas_set_document(st->canvas, st->doc);
     update_page_label(st);
+    
+    // Save the new empty document
+    autosave_document(st);
 }
 
 static void import_image_from_file(AppState *st) {
@@ -106,6 +131,40 @@ static void on_action_next_page(GtkWidget *btn, gpointer user_data) {
     update_page_label(st);
 }
 
+static void on_action_delete_page(GtkWidget *btn, gpointer user_data) {
+    (void)btn;
+    AppState *st = (AppState*)user_data;
+    if (!st->doc) return;
+    if (document_page_count(st->doc) <= 1) return; // Keep at least one page
+    
+    document_remove_current_page(st->doc);
+    cheat_canvas_set_document(st->canvas, st->doc); // Refresh canvas
+    update_page_label(st);
+    autosave_document(st);
+}
+
+static void on_action_move_page_up(GtkWidget *btn, gpointer user_data) {
+    (void)btn;
+    AppState *st = (AppState*)user_data;
+    if (!st->doc) return;
+    
+    document_move_page_up(st->doc);
+    cheat_canvas_set_document(st->canvas, st->doc);
+    update_page_label(st);
+    autosave_document(st);
+}
+
+static void on_action_move_page_down(GtkWidget *btn, gpointer user_data) {
+    (void)btn;
+    AppState *st = (AppState*)user_data;
+    if (!st->doc) return;
+    
+    document_move_page_down(st->doc);
+    cheat_canvas_set_document(st->canvas, st->doc);
+    update_page_label(st);
+    autosave_document(st);
+}
+
 static gboolean on_key_press(GtkWidget *w, GdkEventKey *ev, gpointer user_data) {
     (void)w;
     AppState *st = (AppState*)user_data;
@@ -121,6 +180,9 @@ static gboolean on_key_press(GtkWidget *w, GdkEventKey *ev, gpointer user_data) 
     if (key == GDK_KEY_c || key == GDK_KEY_C) { cheat_canvas_toggle_crop_mode(st->canvas); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_Page_Up) { on_action_prev_page(NULL, st); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_Page_Down) { on_action_next_page(NULL, st); return TRUE; }
+    if ((state & GDK_CONTROL_MASK) && (state & GDK_SHIFT_MASK) && key == GDK_KEY_D) { on_action_delete_page(NULL, st); return TRUE; }
+    if ((state & GDK_CONTROL_MASK) && (state & GDK_SHIFT_MASK) && key == GDK_KEY_Up) { on_action_move_page_up(NULL, st); return TRUE; }
+    if ((state & GDK_CONTROL_MASK) && (state & GDK_SHIFT_MASK) && key == GDK_KEY_Down) { on_action_move_page_down(NULL, st); return TRUE; }
     return FALSE;
 }
 
@@ -165,7 +227,20 @@ static void activate(GtkApplication* app, gpointer user_data) {
     (void)user_data;
     AppState *st = g_new0(AppState, 1);
     st->app = app;
-    st->doc = document_new();
+    st->autosave_timer_id = 0;
+    st->autosave_path = get_autosave_path();
+    
+    // Try to load autosaved document
+    GError *error = NULL;
+    st->doc = document_load_from_file(st->autosave_path, &error);
+    if (!st->doc) {
+        // If load fails (e.g., no autosave file), create new document
+        if (error) {
+            g_debug("Could not load autosave: %s", error->message);
+            g_error_free(error);
+        }
+        st->doc = document_new();
+    }
 
     GtkWidget *win = gtk_application_window_new(app);
     gtk_window_set_title(GTK_WINDOW(win), "Cheatsheet Maker");
@@ -221,6 +296,21 @@ static void activate(GtkApplication* app, gpointer user_data) {
     g_signal_connect(btn_next, "clicked", G_CALLBACK(on_action_next_page), st);
     gtk_box_pack_start(GTK_BOX(toolbar), btn_next, FALSE, FALSE, 4);
 
+    GtkWidget *sp2 = gtk_separator_new(GTK_ORIENTATION_VERTICAL);
+    gtk_box_pack_start(GTK_BOX(toolbar), sp2, FALSE, FALSE, 8);
+
+    GtkWidget *btn_delete_page = gtk_button_new_with_label("Delete Page");
+    g_signal_connect(btn_delete_page, "clicked", G_CALLBACK(on_action_delete_page), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), btn_delete_page, FALSE, FALSE, 4);
+
+    GtkWidget *btn_move_up = gtk_button_new_with_label("▲ Move Up");
+    g_signal_connect(btn_move_up, "clicked", G_CALLBACK(on_action_move_page_up), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), btn_move_up, FALSE, FALSE, 4);
+
+    GtkWidget *btn_move_down = gtk_button_new_with_label("▼ Move Down");
+    g_signal_connect(btn_move_down, "clicked", G_CALLBACK(on_action_move_page_down), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), btn_move_down, FALSE, FALSE, 4);
+
     // Pack canvas after toolbar for proper layout
     gtk_box_pack_start(GTK_BOX(vbox), canvas, TRUE, TRUE, 0);
 
@@ -228,6 +318,9 @@ static void activate(GtkApplication* app, gpointer user_data) {
     setup_dnd(canvas, st);
 
     g_signal_connect(win, "key-press-event", G_CALLBACK(on_key_press), st);
+
+    // Setup auto-save timer (every 30 seconds)
+    st->autosave_timer_id = g_timeout_add_seconds(30, autosave_timer_callback, st);
 
     update_page_label(st);
     gtk_widget_show_all(win);

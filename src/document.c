@@ -46,6 +46,34 @@ void document_remove_current_page(Document *doc) {
     if (doc->current_page >= (int)doc->pages->len) doc->current_page = (int)doc->pages->len - 1;
 }
 
+void document_move_page_up(Document *doc) {
+    g_return_if_fail(doc != NULL);
+    if (doc->current_page <= 0) return; // already at top
+    
+    // Swap current page with the one above it
+    gpointer page = g_ptr_array_index(doc->pages, doc->current_page);
+    gpointer prev_page = g_ptr_array_index(doc->pages, doc->current_page - 1);
+    
+    g_ptr_array_index(doc->pages, doc->current_page) = prev_page;
+    g_ptr_array_index(doc->pages, doc->current_page - 1) = page;
+    
+    doc->current_page--;
+}
+
+void document_move_page_down(Document *doc) {
+    g_return_if_fail(doc != NULL);
+    if (doc->current_page >= (int)doc->pages->len - 1) return; // already at bottom
+    
+    // Swap current page with the one below it
+    gpointer page = g_ptr_array_index(doc->pages, doc->current_page);
+    gpointer next_page = g_ptr_array_index(doc->pages, doc->current_page + 1);
+    
+    g_ptr_array_index(doc->pages, doc->current_page) = next_page;
+    g_ptr_array_index(doc->pages, doc->current_page + 1) = page;
+    
+    doc->current_page++;
+}
+
 Page *document_current_page(Document *doc) {
     g_return_val_if_fail(doc != NULL, NULL);
     return (Page*)g_ptr_array_index(doc->pages, (guint)CLAMP(doc->current_page, 0, (int)doc->pages->len - 1));

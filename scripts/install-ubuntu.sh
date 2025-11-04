@@ -78,9 +78,9 @@ install_deps() {
     tail -n 50 "$LOG" >&2 || true
     exit 1
   fi
-  echo "   - Installing packages (quiet): build-essential, make, pkg-config, libgtk-3-dev, libcairo2-dev, libgdk-pixbuf2.0-dev"
+  echo "   - Installing packages (quiet): build-essential, make, pkg-config, libgtk-3-dev, libcairo2-dev, libgdk-pixbuf2.0-dev, libjson-glib-dev"
   if ! sudo apt-get -y -qq install build-essential make pkg-config \
-    libgtk-3-dev libcairo2-dev libgdk-pixbuf2.0-dev >>"$LOG" 2>&1; then
+    libgtk-3-dev libcairo2-dev libgdk-pixbuf2.0-dev libjson-glib-dev >>"$LOG" 2>&1; then
     echo "Apt install failed. See $LOG for details." >&2
     tail -n 50 "$LOG" >&2 || true
     exit 1

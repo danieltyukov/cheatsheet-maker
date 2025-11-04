@@ -31,6 +31,8 @@ Document *document_new(void);
 void document_free(Document *doc);
 Page *document_add_page(Document *doc);
 void document_remove_current_page(Document *doc);
+void document_move_page_up(Document *doc);
+void document_move_page_down(Document *doc);
 Page *document_current_page(Document *doc);
 int document_page_count(const Document *doc);
 
