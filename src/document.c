@@ -3,6 +3,7 @@
 static Page *page_new(void) {
     Page *p = g_new0(Page, 1);
     p->items = NULL;
+    p->strokes = NULL;
     return p;
 }
 
@@ -11,6 +12,10 @@ static void page_free(Page *p) {
         image_item_free((ImageItem*)l->data);
     }
     g_list_free(p->items);
+    for (GList *l = p->strokes; l; l = l->next) {
+        stroke_free((Stroke*)l->data);
+    }
+    g_list_free(p->strokes);
     g_free(p);
 }
 
@@ -124,4 +129,41 @@ void page_bring_to_front(Page *page, ImageItem *item) {
     if (!link) return;
     page->items = g_list_remove_link(page->items, link);
     page->items = g_list_concat(page->items, link); // move to tail (front)
+}
+
+Stroke *stroke_new(double r, double g, double b, double a, double width) {
+    Stroke *s = g_new0(Stroke, 1);
+    s->points = g_array_new(FALSE, FALSE, sizeof(Point));
+    s->r = r;
+    s->g = g;
+    s->b = b;
+    s->a = a;
+    s->width = width;
+    return s;
+}
+
+void stroke_free(Stroke *stroke) {
+    if (!stroke) return;
+    if (stroke->points) g_array_free(stroke->points, TRUE);
+    g_free(stroke);
+}
+
+void stroke_add_point(Stroke *stroke, double x, double y) {
+    g_return_if_fail(stroke != NULL && stroke->points != NULL);
+    Point p = {x, y};
+    g_array_append_val(stroke->points, p);
+}
+
+void page_add_stroke(Page *page, Stroke *stroke) {
+    g_return_if_fail(page != NULL && stroke != NULL);
+    page->strokes = g_list_append(page->strokes, stroke);
+}
+
+void page_clear_strokes(Page *page) {
+    g_return_if_fail(page != NULL);
+    for (GList *l = page->strokes; l; l = l->next) {
+        stroke_free((Stroke*)l->data);
+    }
+    g_list_free(page->strokes);
+    page->strokes = NULL;
 }

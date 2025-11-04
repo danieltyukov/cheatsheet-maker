@@ -13,6 +13,9 @@ typedef struct AppState {
     GtkWidget *page_label;
     guint autosave_timer_id;
     gchar *autosave_path;
+    GtkWidget *draw_button;
+    GtkWidget *color_button;
+    GtkWidget *width_spin;
 } AppState;
 
 static void update_page_label(AppState *st) {
@@ -178,6 +181,13 @@ static gboolean on_key_press(GtkWidget *w, GdkEventKey *ev, gpointer user_data) 
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_0) { cheat_canvas_zoom_reset(st->canvas); return TRUE; }
     if (key == GDK_KEY_Delete || key == GDK_KEY_BackSpace) { cheat_canvas_delete_selection(st->canvas); return TRUE; }
     if (key == GDK_KEY_c || key == GDK_KEY_C) { cheat_canvas_toggle_crop_mode(st->canvas); return TRUE; }
+    if (key == GDK_KEY_d || key == GDK_KEY_D) { 
+        cheat_canvas_toggle_draw_mode(st->canvas); 
+        // Update toggle button state
+        gboolean active = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(st->draw_button));
+        gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(st->draw_button), !active);
+        return TRUE; 
+    }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_Page_Up) { on_action_prev_page(NULL, st); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && key == GDK_KEY_Page_Down) { on_action_next_page(NULL, st); return TRUE; }
     if ((state & GDK_CONTROL_MASK) && (state & GDK_SHIFT_MASK) && key == GDK_KEY_D) { on_action_delete_page(NULL, st); return TRUE; }
@@ -221,6 +231,28 @@ static void on_crop_toggled(GtkToggleButton *b, gpointer u) {
     AppState *st = (AppState*)u;
     if (!st || !st->canvas) return;
     cheat_canvas_toggle_crop_mode(st->canvas);
+}
+
+static void on_draw_toggled(GtkToggleButton *b, gpointer u) {
+    (void)b;
+    AppState *st = (AppState*)u;
+    if (!st || !st->canvas) return;
+    cheat_canvas_toggle_draw_mode(st->canvas);
+}
+
+static void on_color_set(GtkColorButton *btn, gpointer u) {
+    AppState *st = (AppState*)u;
+    if (!st || !st->canvas) return;
+    GdkRGBA color;
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(btn), &color);
+    cheat_canvas_set_draw_color(st->canvas, color.red, color.green, color.blue, color.alpha);
+}
+
+static void on_width_changed(GtkSpinButton *btn, gpointer u) {
+    AppState *st = (AppState*)u;
+    if (!st || !st->canvas) return;
+    double width = gtk_spin_button_get_value(btn);
+    cheat_canvas_set_draw_width(st->canvas, width);
 }
 
 static void activate(GtkApplication* app, gpointer user_data) {
@@ -277,6 +309,25 @@ static void activate(GtkApplication* app, gpointer user_data) {
     // Connect with AppState so we can access canvas reliably
     g_signal_connect(btn_crop, "toggled", G_CALLBACK(on_crop_toggled), st);
     gtk_box_pack_start(GTK_BOX(toolbar), btn_crop, FALSE, FALSE, 4);
+
+    st->draw_button = gtk_toggle_button_new_with_label("Draw");
+    g_signal_connect(st->draw_button, "toggled", G_CALLBACK(on_draw_toggled), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), st->draw_button, FALSE, FALSE, 4);
+
+    // Color picker for drawing
+    GdkRGBA black = {0.0, 0.0, 0.0, 1.0};
+    st->color_button = gtk_color_button_new_with_rgba(&black);
+    gtk_color_button_set_title(GTK_COLOR_BUTTON(st->color_button), "Drawing Color");
+    gtk_color_chooser_set_use_alpha(GTK_COLOR_CHOOSER(st->color_button), TRUE);
+    g_signal_connect(st->color_button, "color-set", G_CALLBACK(on_color_set), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), st->color_button, FALSE, FALSE, 4);
+
+    // Stroke width spinner
+    st->width_spin = gtk_spin_button_new_with_range(0.5, 20.0, 0.5);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(st->width_spin), 2.0);
+    gtk_widget_set_tooltip_text(st->width_spin, "Stroke Width");
+    g_signal_connect(st->width_spin, "value-changed", G_CALLBACK(on_width_changed), st);
+    gtk_box_pack_start(GTK_BOX(toolbar), st->width_spin, FALSE, FALSE, 4);
 
     GtkWidget *btn_export = gtk_button_new_with_label("Export PDF");
     g_signal_connect(btn_export, "clicked", G_CALLBACK(on_action_export_pdf), st);

@@ -103,6 +103,45 @@ gboolean document_save_to_file(Document *doc, const char *filepath, GError **err
         }
         
         json_builder_end_array(builder);
+        
+        // Save strokes array
+        json_builder_set_member_name(builder, "strokes");
+        json_builder_begin_array(builder);
+        
+        for (GList *l = page->strokes; l; l = l->next) {
+            Stroke *stroke = (Stroke*)l->data;
+            json_builder_begin_object(builder);
+            
+            // Save color
+            json_builder_set_member_name(builder, "r");
+            json_builder_add_double_value(builder, stroke->r);
+            json_builder_set_member_name(builder, "g");
+            json_builder_add_double_value(builder, stroke->g);
+            json_builder_set_member_name(builder, "b");
+            json_builder_add_double_value(builder, stroke->b);
+            json_builder_set_member_name(builder, "a");
+            json_builder_add_double_value(builder, stroke->a);
+            json_builder_set_member_name(builder, "width");
+            json_builder_add_double_value(builder, stroke->width);
+            
+            // Save points
+            json_builder_set_member_name(builder, "points");
+            json_builder_begin_array(builder);
+            for (guint j = 0; j < stroke->points->len; j++) {
+                Point *pt = &g_array_index(stroke->points, Point, j);
+                json_builder_begin_object(builder);
+                json_builder_set_member_name(builder, "x");
+                json_builder_add_double_value(builder, pt->x);
+                json_builder_set_member_name(builder, "y");
+                json_builder_add_double_value(builder, pt->y);
+                json_builder_end_object(builder);
+            }
+            json_builder_end_array(builder);
+            
+            json_builder_end_object(builder);
+        }
+        
+        json_builder_end_array(builder);
         json_builder_end_object(builder);
     }
     
@@ -220,6 +259,48 @@ Document *document_load_from_file(const char *filepath, GError **error) {
                 
                 // Add to page
                 page->items = g_list_append(page->items, item);
+            }
+        }
+        
+        // Load strokes
+        if (json_object_has_member(page_obj, "strokes")) {
+            JsonArray *strokes_array = json_object_get_array_member(page_obj, "strokes");
+            guint num_strokes = json_array_get_length(strokes_array);
+            
+            for (guint j = 0; j < num_strokes; j++) {
+                JsonNode *stroke_node = json_array_get_element(strokes_array, j);
+                if (!JSON_NODE_HOLDS_OBJECT(stroke_node)) continue;
+                
+                JsonObject *stroke_obj = json_node_get_object(stroke_node);
+                
+                // Load color and width
+                double r = json_object_get_double_member(stroke_obj, "r");
+                double g = json_object_get_double_member(stroke_obj, "g");
+                double b = json_object_get_double_member(stroke_obj, "b");
+                double a = json_object_get_double_member(stroke_obj, "a");
+                double width = json_object_get_double_member(stroke_obj, "width");
+                
+                Stroke *stroke = stroke_new(r, g, b, a, width);
+                
+                // Load points
+                if (json_object_has_member(stroke_obj, "points")) {
+                    JsonArray *points_array = json_object_get_array_member(stroke_obj, "points");
+                    guint num_points = json_array_get_length(points_array);
+                    
+                    for (guint k = 0; k < num_points; k++) {
+                        JsonNode *point_node = json_array_get_element(points_array, k);
+                        if (!JSON_NODE_HOLDS_OBJECT(point_node)) continue;
+                        
+                        JsonObject *point_obj = json_node_get_object(point_node);
+                        double px = json_object_get_double_member(point_obj, "x");
+                        double py = json_object_get_double_member(point_obj, "y");
+                        
+                        stroke_add_point(stroke, px, py);
+                    }
+                }
+                
+                // Add to page
+                page->strokes = g_list_append(page->strokes, stroke);
             }
         }
         

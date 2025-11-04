@@ -6,8 +6,14 @@ struct _CheatCanvas {
     Document *doc;               // not owned
     double zoom;                 // screen pixels per point
     gboolean crop_mode;
+    gboolean draw_mode;
 
     ImageItem *selected;
+
+    // Drawing state
+    Stroke *current_stroke;
+    double draw_r, draw_g, draw_b, draw_a;
+    double draw_width;
 
     // drag state
     gboolean dragging;
@@ -34,8 +40,15 @@ static void cheat_canvas_init(CheatCanvas *self) {
     self->doc = NULL;
     self->zoom = 1.25; // default zoom
     self->crop_mode = FALSE;
+    self->draw_mode = FALSE;
     self->selected = NULL;
     self->dragging = FALSE;
+    self->current_stroke = NULL;
+    self->draw_r = 0.0;
+    self->draw_g = 0.0;
+    self->draw_b = 0.0;
+    self->draw_a = 1.0;
+    self->draw_width = 2.0;
     gtk_widget_add_events(GTK_WIDGET(self), GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
                                               GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK);
     g_signal_connect(self, "draw", G_CALLBACK(on_draw), NULL);
@@ -76,7 +89,31 @@ void cheat_canvas_zoom_in(CheatCanvas *self) { self->zoom *= 1.1; cheat_canvas_q
 void cheat_canvas_zoom_out(CheatCanvas *self) { self->zoom /= 1.1; if (self->zoom < 0.2) self->zoom = 0.2; cheat_canvas_queue_redraw(self); }
 void cheat_canvas_zoom_reset(CheatCanvas *self) { self->zoom = 1.25; cheat_canvas_queue_redraw(self); }
 
-void cheat_canvas_toggle_crop_mode(CheatCanvas *self) { self->crop_mode = !self->crop_mode; cheat_canvas_queue_redraw(self); }
+void cheat_canvas_toggle_crop_mode(CheatCanvas *self) { 
+    self->crop_mode = !self->crop_mode;
+    if (self->crop_mode) self->draw_mode = FALSE; // Disable draw mode when crop is on
+    cheat_canvas_queue_redraw(self); 
+}
+
+void cheat_canvas_toggle_draw_mode(CheatCanvas *self) { 
+    self->draw_mode = !self->draw_mode;
+    if (self->draw_mode) {
+        self->crop_mode = FALSE; // Disable crop mode when draw is on
+        self->selected = NULL;    // Deselect items when drawing
+    }
+    cheat_canvas_queue_redraw(self); 
+}
+
+void cheat_canvas_set_draw_color(CheatCanvas *self, double r, double g, double b, double a) {
+    self->draw_r = r;
+    self->draw_g = g;
+    self->draw_b = b;
+    self->draw_a = a;
+}
+
+void cheat_canvas_set_draw_width(CheatCanvas *self, double width) {
+    self->draw_width = width;
+}
 
 static void canvas_add_item_centered(CheatCanvas *self, ImageItem *it) {
     Page *p = document_current_page(self->doc);
@@ -241,6 +278,27 @@ static void draw_crop_overlay(cairo_t *cr, ImageItem *it) {
     cairo_restore(cr);
 }
 
+static void draw_stroke(cairo_t *cr, Stroke *stroke) {
+    if (!stroke || !stroke->points || stroke->points->len < 2) return;
+    
+    cairo_save(cr);
+    cairo_set_source_rgba(cr, stroke->r, stroke->g, stroke->b, stroke->a);
+    cairo_set_line_width(cr, stroke->width);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join(cr, CAIRO_LINE_JOIN_ROUND);
+    
+    Point *p0 = &g_array_index(stroke->points, Point, 0);
+    cairo_move_to(cr, p0->x, p0->y);
+    
+    for (guint i = 1; i < stroke->points->len; i++) {
+        Point *p = &g_array_index(stroke->points, Point, i);
+        cairo_line_to(cr, p->x, p->y);
+    }
+    
+    cairo_stroke(cr);
+    cairo_restore(cr);
+}
+
 static void draw_page_and_items(CheatCanvas *self, cairo_t *cr, int width, int height) {
     // background checker
     draw_checker(cr, 0, 0, width, height);
@@ -275,8 +333,19 @@ static void draw_page_and_items(CheatCanvas *self, cairo_t *cr, int width, int h
         draw_image_item(cr, it);
     }
 
+    // draw strokes
+    for (GList *l = p->strokes; l; l = l->next) {
+        Stroke *s = (Stroke*)l->data;
+        draw_stroke(cr, s);
+    }
+
+    // draw current stroke being drawn
+    if (self->current_stroke) {
+        draw_stroke(cr, self->current_stroke);
+    }
+
     // overlays
-    if (self->selected) {
+    if (self->selected && !self->draw_mode) {
         draw_selection(cr, self->selected);
         if (self->crop_mode) draw_crop_overlay(cr, self->selected);
     }
@@ -334,6 +403,14 @@ static gboolean on_button_press(GtkWidget *w, GdkEventButton *ev, gpointer user_
     GtkAllocation alloc; gtk_widget_get_allocation(w, &alloc);
     double px, py; px_to_page(self, ev->x, ev->y, &px, &py, alloc.width, alloc.height);
 
+    // If in draw mode, start a new stroke
+    if (self->draw_mode && self->doc) {
+        self->current_stroke = stroke_new(self->draw_r, self->draw_g, self->draw_b, self->draw_a, self->draw_width);
+        stroke_add_point(self->current_stroke, px, py);
+        cheat_canvas_queue_redraw(self);
+        return TRUE;
+    }
+
     ImageItem *hit = self->doc ? hit_test(self, px, py) : NULL;
     self->selected = hit;
     if (hit) {
@@ -364,6 +441,15 @@ static gboolean on_button_release(GtkWidget *w, GdkEventButton *ev, gpointer use
     (void)user_data;
     CheatCanvas *self = CHEAT_CANVAS(w);
     if (ev->button != GDK_BUTTON_PRIMARY) return FALSE;
+    
+    // If we were drawing, finish the stroke
+    if (self->current_stroke && self->doc) {
+        Page *p = document_current_page(self->doc);
+        page_add_stroke(p, self->current_stroke);
+        self->current_stroke = NULL;
+        cheat_canvas_queue_redraw(self);
+    }
+    
     self->dragging = FALSE;
     self->drag_kind = DRAG_NONE;
     return TRUE;
@@ -373,11 +459,19 @@ static gboolean on_motion(GtkWidget *w, GdkEventMotion *ev, gpointer user_data) 
     (void)user_data;
     CheatCanvas *self = CHEAT_CANVAS(w);
     
+    GtkAllocation alloc; gtk_widget_get_allocation(w, &alloc);
+    double px, py; px_to_page(self, ev->x, ev->y, &px, &py, alloc.width, alloc.height);
+    
+    // If drawing, add point to current stroke
+    if (self->current_stroke) {
+        stroke_add_point(self->current_stroke, px, py);
+        cheat_canvas_queue_redraw(self);
+        return TRUE;
+    }
+    
     if (!self->dragging) {
         // Update cursor based on what we're hovering over
-        if (self->selected) {
-            GtkAllocation alloc; gtk_widget_get_allocation(w, &alloc);
-            double px, py; px_to_page(self, ev->x, ev->y, &px, &py, alloc.width, alloc.height);
+        if (self->selected && !self->draw_mode) {
             int handle = -1;
             if (self->crop_mode) {
                 handle = hit_crop_handle(self->selected, px, py, 10.0);
@@ -398,7 +492,6 @@ static gboolean on_motion(GtkWidget *w, GdkEventMotion *ev, gpointer user_data) 
     }
     
     if (!self->selected) return FALSE;
-    GtkAllocation alloc; gtk_widget_get_allocation(w, &alloc);
 
     double dpx = (ev->x - self->drag_start_px) / self->zoom;
     double dpy = (ev->y - self->drag_start_py) / self->zoom;

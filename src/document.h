@@ -10,6 +10,16 @@ extern "C" {
 #define A4_WIDTH_PT  595.275590551 // 210mm
 #define A4_HEIGHT_PT 841.889763780 // 297mm
 
+typedef struct _Point {
+    double x, y;
+} Point;
+
+typedef struct _Stroke {
+    GArray *points;             // array of Point
+    double r, g, b, a;          // color (RGBA)
+    double width;               // stroke width in points
+} Stroke;
+
 typedef struct _ImageItem {
     GdkPixbuf *pixbuf;          // referenced image
     double x, y;                // top-left position in page points
@@ -20,6 +30,7 @@ typedef struct _ImageItem {
 
 typedef struct _Page {
     GList *items;               // list of ImageItem* (front at tail)
+    GList *strokes;             // list of Stroke* (drawing strokes)
 } Page;
 
 typedef struct _Document {
@@ -42,6 +53,13 @@ void image_item_free(ImageItem *item);
 void page_add_item(Page *page, ImageItem *item);
 void page_remove_item(Page *page, ImageItem *item);
 void page_bring_to_front(Page *page, ImageItem *item);
+
+Stroke *stroke_new(double r, double g, double b, double a, double width);
+void stroke_free(Stroke *stroke);
+void stroke_add_point(Stroke *stroke, double x, double y);
+
+void page_add_stroke(Page *page, Stroke *stroke);
+void page_clear_strokes(Page *page);
 
 #ifdef __cplusplus
 }
