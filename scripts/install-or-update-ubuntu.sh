@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Cheatsheet Maker installer for Ubuntu (user-level, no root required)
-# - Installs build deps (needs sudo)
+# Cheatsheet Maker installer/updater for Ubuntu (user-level, no root required)
+# - Installs or updates the application
+# - Installs build deps (needs sudo) on first install
 # - Builds the app
 # - Installs binary to ~/.local/bin
 # - Installs icon to ~/.local/share/icons/hicolor/scalable/apps
 # - Creates desktop launcher in ~/.local/share/applications and ~/Desktop
 #
 # Usage:
-#   ./scripts/install-ubuntu.sh                   # normal install using bundled SVG icon
-#   ICON=assets/logo.png ./scripts/install-ubuntu.sh   # use a custom PNG icon if present
-#   ./scripts/install-ubuntu.sh --no-deps          # skip apt install (install deps yourself)
+#   ./scripts/install-or-update-ubuntu.sh                # install or update
+#   ./scripts/install-or-update-ubuntu.sh --no-deps      # skip apt install (for updates)
+#   ./scripts/install-or-update-ubuntu.sh --force-deps   # force dependency check even if already installed
+#   ICON=assets/logo.png ./scripts/install-or-update-ubuntu.sh   # use a custom PNG icon if present
 #
 # Notes:
 # - If you want to use your own icon, place it at assets/logo.png or pass ICON=/path/to.png
 # - For system-wide install, copy the binary to /usr/local/bin and .desktop to /usr/share/applications
+# - When updating, dependencies are skipped by default unless --force-deps is used
 
 APP_NAME="cheatsheet-maker"
 APP_ID="com.example.cheatsheet"
@@ -33,6 +36,14 @@ DESKTOP_FILE="$DESKTOP_DIR/$APP_NAME.desktop"
 USER_DESKTOP="$HOME/Desktop/$APP_NAME.desktop"
 
 SKIP_DEPS=0
+FORCE_DEPS=0
+IS_UPDATE=0
+
+# Check if this is an update (binary already exists)
+if [[ -f "$APP_BIN" ]]; then
+  IS_UPDATE=1
+  SKIP_DEPS=1  # Skip deps by default for updates
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -40,17 +51,31 @@ for arg in "$@"; do
       SKIP_DEPS=1
       shift
       ;;
+    --force-deps)
+      FORCE_DEPS=1
+      SKIP_DEPS=0
+      shift
+      ;;
     -h|--help)
       cat <<EOF
-Cheatsheet Maker installer
+Cheatsheet Maker installer/updater
+
+Usage:
+  ./scripts/install-or-update-ubuntu.sh           # install or update
+  ./scripts/install-or-update-ubuntu.sh --no-deps # skip dependency installation
+  ./scripts/install-or-update-ubuntu.sh --force-deps  # force dependency check
 
 Options:
-  --no-deps   Skip installing build dependencies with apt
+  --no-deps      Skip installing build dependencies with apt
+  --force-deps   Force dependency installation even on updates
 
 Environment:
   ICON=/path/to/icon.png  Use a custom PNG icon
 
-This installer performs a per-user install under ~/.local.
+This script performs a per-user install under ~/.local.
+On first install, it will install system dependencies.
+On updates, dependencies are skipped unless --force-deps is used.
+
 Note: When prompted by sudo, the password input is not echoed (no stars) — just type and press Enter.
 EOF
       exit 0
@@ -88,7 +113,11 @@ install_deps() {
 }
 
 build_app() {
-  echo "==> Building $APP_NAME"
+  if [[ "$IS_UPDATE" -eq 1 ]]; then
+    echo "==> Rebuilding $APP_NAME (update mode)"
+  else
+    echo "==> Building $APP_NAME (first install)"
+  fi
   ( cd "$ROOT_DIR" && make clean >/dev/null 2>&1 || true )
   BUILD_LOG="/tmp/${APP_NAME}-build-$(date +%s).log"
   if ! ( cd "$ROOT_DIR" && make -s -j"$(nproc || echo 2)" >"$BUILD_LOG" 2>&1 ); then
@@ -99,7 +128,17 @@ build_app() {
 }
 
 install_binary() {
-  echo "==> Installing binary to $APP_BIN"
+  if [[ "$IS_UPDATE" -eq 1 ]]; then
+    echo "==> Updating binary at $APP_BIN"
+    # Kill any running instances before updating
+    if pgrep -x "$APP_NAME" >/dev/null 2>&1; then
+      echo "   - Stopping running instance(s) of $APP_NAME..."
+      pkill -x "$APP_NAME" || true
+      sleep 1
+    fi
+  else
+    echo "==> Installing binary to $APP_BIN"
+  fi
   mkdir -p "$BIN_DIR"
   install -m 0755 "$ROOT_DIR/$APP_NAME" "$APP_BIN"
 }
@@ -155,23 +194,46 @@ EOF
 
 post_notes() {
   echo
-  echo "Installation complete!"
-  echo
-  echo "Run:  $APP_NAME"
-  echo "      or use the launcher: Cheatsheet Maker"
-  echo
-  echo "If the icon doesn't appear immediately, try logging out and back in, or run:"
-  echo "  update-desktop-database ~/.local/share/applications"
-  echo "  gtk-update-icon-cache -f ~/.local/share/icons"
+  if [[ "$IS_UPDATE" -eq 1 ]]; then
+    echo "Update complete!"
+    echo
+    echo "The application has been updated to the latest version."
+    echo "Run:  $APP_NAME"
+    echo "      or use the launcher: Cheatsheet Maker"
+  else
+    echo "Installation complete!"
+    echo
+    echo "Run:  $APP_NAME"
+    echo "      or use the launcher: Cheatsheet Maker"
+    echo
+    echo "If the icon doesn't appear immediately, try logging out and back in, or run:"
+    echo "  update-desktop-database ~/.local/share/applications"
+    echo "  gtk-update-icon-cache -f ~/.local/share/icons"
+  fi
   echo
 }
 
 # Main
-if [[ "$SKIP_DEPS" -eq 1 ]]; then
-  echo "==> Skipping dependency installation as requested (--no-deps)."
-  echo "Make sure these packages are installed, otherwise the build will fail:"
-  echo "  sudo apt install -y build-essential make pkg-config \\
-    libgtk-3-dev libcairo2-dev libgdk-pixbuf2.0-dev"
+if [[ "$IS_UPDATE" -eq 1 ]]; then
+  echo "========================================="
+  echo " Updating Cheatsheet Maker"
+  echo "========================================="
+else
+  echo "========================================="
+  echo " Installing Cheatsheet Maker"
+  echo "========================================="
+fi
+
+if [[ "$SKIP_DEPS" -eq 1 && "$FORCE_DEPS" -eq 0 ]]; then
+  if [[ "$IS_UPDATE" -eq 1 ]]; then
+    echo "==> Skipping dependency installation (update mode)."
+    echo "    Use --force-deps to reinstall dependencies if needed."
+  else
+    echo "==> Skipping dependency installation as requested (--no-deps)."
+    echo "Make sure these packages are installed, otherwise the build will fail:"
+    echo "  sudo apt install -y build-essential make pkg-config \\
+    libgtk-3-dev libcairo2-dev libgdk-pixbuf2.0-dev libjson-glib-dev"
+  fi
 else
   install_deps
 fi
