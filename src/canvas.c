@@ -15,14 +15,19 @@ struct _CheatCanvas {
     double draw_r, draw_g, draw_b, draw_a;
     double draw_width;
 
+    // Pan state
+    double pan_offset_x;         // pan offset in screen pixels
+    double pan_offset_y;
+
     // drag state
     gboolean dragging;
-    enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_CROP } drag_kind;
+    enum { DRAG_NONE, DRAG_MOVE, DRAG_RESIZE, DRAG_CROP, DRAG_PAN } drag_kind;
     int drag_handle; // which corner/edge for resize/crop
     double drag_start_px, drag_start_py; // device px
     // original values
     double orig_x, orig_y, orig_w, orig_h;
     int orig_cx, orig_cy, orig_cw, orig_ch;
+    double orig_pan_x, orig_pan_y;
 };
 
 G_DEFINE_TYPE(CheatCanvas, cheat_canvas, GTK_TYPE_DRAWING_AREA)
@@ -49,6 +54,8 @@ static void cheat_canvas_init(CheatCanvas *self) {
     self->draw_b = 0.0;
     self->draw_a = 1.0;
     self->draw_width = 2.0;
+    self->pan_offset_x = 0.0;
+    self->pan_offset_y = 0.0;
     gtk_widget_add_events(GTK_WIDGET(self), GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
                                               GDK_POINTER_MOTION_MASK | GDK_SCROLL_MASK);
     g_signal_connect(self, "draw", G_CALLBACK(on_draw), NULL);
@@ -80,6 +87,8 @@ void cheat_canvas_set_document(CheatCanvas *self, Document *doc) {
     g_return_if_fail(CHEAT_IS_CANVAS(self));
     self->doc = doc;
     self->selected = NULL;
+    self->pan_offset_x = 0.0;
+    self->pan_offset_y = 0.0;
     cheat_canvas_queue_redraw(self);
 }
 
@@ -87,7 +96,12 @@ Document *cheat_canvas_get_document(CheatCanvas *self) { return self->doc; }
 
 void cheat_canvas_zoom_in(CheatCanvas *self) { self->zoom *= 1.1; cheat_canvas_queue_redraw(self); }
 void cheat_canvas_zoom_out(CheatCanvas *self) { self->zoom /= 1.1; if (self->zoom < 0.2) self->zoom = 0.2; cheat_canvas_queue_redraw(self); }
-void cheat_canvas_zoom_reset(CheatCanvas *self) { self->zoom = 1.25; cheat_canvas_queue_redraw(self); }
+void cheat_canvas_zoom_reset(CheatCanvas *self) { 
+    self->zoom = 1.25; 
+    self->pan_offset_x = 0.0;
+    self->pan_offset_y = 0.0;
+    cheat_canvas_queue_redraw(self); 
+}
 
 void cheat_canvas_toggle_crop_mode(CheatCanvas *self) { 
     self->crop_mode = !self->crop_mode;
@@ -181,8 +195,8 @@ void cheat_canvas_prev_page(CheatCanvas *self) {
 static void px_to_page(CheatCanvas *self, double sx, double sy, double *out_px, double *out_py, int alloc_w, int alloc_h) {
     double w = A4_WIDTH_PT * self->zoom;
     double h = A4_HEIGHT_PT * self->zoom;
-    double offx = (alloc_w - w) / 2.0;
-    double offy = (alloc_h - h) / 2.0;
+    double offx = (alloc_w - w) / 2.0 + self->pan_offset_x;
+    double offy = (alloc_h - h) / 2.0 + self->pan_offset_y;
     if (out_px) *out_px = (sx - offx) / self->zoom;
     if (out_py) *out_py = (sy - offy) / self->zoom;
 }
@@ -327,8 +341,8 @@ static void draw_page_and_items(CheatCanvas *self, cairo_t *cr, int width, int h
     // page rect in px
     double pw = A4_WIDTH_PT * self->zoom;
     double ph = A4_HEIGHT_PT * self->zoom;
-    double offx = (width - pw) / 2.0;
-    double offy = (height - ph) / 2.0;
+    double offx = (width - pw) / 2.0 + self->pan_offset_x;
+    double offy = (height - ph) / 2.0 + self->pan_offset_y;
 
     cairo_save(cr);
     cairo_translate(cr, offx, offy);
@@ -419,10 +433,30 @@ static int hit_crop_handle(ImageItem *it, double px, double py, double tol) {
 static gboolean on_button_press(GtkWidget *w, GdkEventButton *ev, gpointer user_data) {
     (void)user_data;
     CheatCanvas *self = CHEAT_CANVAS(w);
-    if (ev->button != GDK_BUTTON_PRIMARY) return FALSE;
-
+    
     GtkAllocation alloc; gtk_widget_get_allocation(w, &alloc);
     double px, py; px_to_page(self, ev->x, ev->y, &px, &py, alloc.width, alloc.height);
+
+    // Middle mouse button or right mouse button for panning
+    if (ev->button == GDK_BUTTON_MIDDLE || ev->button == GDK_BUTTON_SECONDARY) {
+        self->dragging = TRUE;
+        self->drag_kind = DRAG_PAN;
+        self->drag_start_px = ev->x;
+        self->drag_start_py = ev->y;
+        self->orig_pan_x = self->pan_offset_x;
+        self->orig_pan_y = self->pan_offset_y;
+        
+        // Set cursor to hand/grabbing cursor during pan
+        GdkWindow *window = gtk_widget_get_window(w);
+        if (window) {
+            GdkCursor *cursor = gdk_cursor_new_for_display(gdk_display_get_default(), GDK_FLEUR);
+            gdk_window_set_cursor(window, cursor);
+            g_object_unref(cursor);
+        }
+        return TRUE;
+    }
+    
+    if (ev->button != GDK_BUTTON_PRIMARY) return FALSE;
 
     // If in draw mode, start a new stroke
     if (self->draw_mode && self->doc) {
@@ -461,7 +495,23 @@ static gboolean on_button_press(GtkWidget *w, GdkEventButton *ev, gpointer user_
 static gboolean on_button_release(GtkWidget *w, GdkEventButton *ev, gpointer user_data) {
     (void)user_data;
     CheatCanvas *self = CHEAT_CANVAS(w);
-    if (ev->button != GDK_BUTTON_PRIMARY) return FALSE;
+    
+    // Reset cursor after panning
+    if (self->drag_kind == DRAG_PAN) {
+        GdkWindow *window = gtk_widget_get_window(w);
+        if (window) {
+            gdk_window_set_cursor(window, NULL);
+        }
+    }
+    
+    if (ev->button != GDK_BUTTON_PRIMARY) {
+        // For middle/right button release, just stop dragging
+        if (ev->button == GDK_BUTTON_MIDDLE || ev->button == GDK_BUTTON_SECONDARY) {
+            self->dragging = FALSE;
+            self->drag_kind = DRAG_NONE;
+        }
+        return FALSE;
+    }
     
     // If we were drawing, finish the stroke
     if (self->current_stroke && self->doc) {
@@ -486,6 +536,16 @@ static gboolean on_motion(GtkWidget *w, GdkEventMotion *ev, gpointer user_data) 
     // If drawing, add point to current stroke
     if (self->current_stroke) {
         stroke_add_point(self->current_stroke, px, py);
+        cheat_canvas_queue_redraw(self);
+        return TRUE;
+    }
+    
+    // Handle panning
+    if (self->dragging && self->drag_kind == DRAG_PAN) {
+        double dpx = ev->x - self->drag_start_px;
+        double dpy = ev->y - self->drag_start_py;
+        self->pan_offset_x = self->orig_pan_x + dpx;
+        self->pan_offset_y = self->orig_pan_y + dpy;
         cheat_canvas_queue_redraw(self);
         return TRUE;
     }
@@ -591,7 +651,31 @@ static gboolean on_motion(GtkWidget *w, GdkEventMotion *ev, gpointer user_data) 
 static gboolean on_scroll(GtkWidget *w, GdkEventScroll *ev, gpointer user_data) {
     (void)user_data;
     CheatCanvas *self = CHEAT_CANVAS(w);
-    if (ev->direction == GDK_SCROLL_UP) cheat_canvas_zoom_in(self);
-    else if (ev->direction == GDK_SCROLL_DOWN) cheat_canvas_zoom_out(self);
+    
+    // Get the page coordinates before zoom
+    GtkAllocation alloc; 
+    gtk_widget_get_allocation(w, &alloc);
+    double px_before, py_before;
+    px_to_page(self, ev->x, ev->y, &px_before, &py_before, alloc.width, alloc.height);
+    
+    // Apply zoom
+    if (ev->direction == GDK_SCROLL_UP) {
+        self->zoom *= 1.1;
+    } else if (ev->direction == GDK_SCROLL_DOWN) {
+        self->zoom /= 1.1;
+        if (self->zoom < 0.2) self->zoom = 0.2;
+    }
+    
+    // Get the page coordinates after zoom (without pan adjustment)
+    double px_after, py_after;
+    px_to_page(self, ev->x, ev->y, &px_after, &py_after, alloc.width, alloc.height);
+    
+    // Adjust pan offset to keep the same point under the cursor
+    double page_delta_x = (px_after - px_before) * self->zoom;
+    double page_delta_y = (py_after - py_before) * self->zoom;
+    self->pan_offset_x -= page_delta_x;
+    self->pan_offset_y -= page_delta_y;
+    
+    cheat_canvas_queue_redraw(self);
     return TRUE;
 }
