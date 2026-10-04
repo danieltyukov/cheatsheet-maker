@@ -50,3 +50,17 @@ describe('validateDocument', () => {
         expect(() => validateDocument(null)).toThrow(/Not a Cheatsheet Maker document/);
     });
 });
+
+describe('colours from files', () => {
+    test('only hex colours are accepted, so a file cannot smuggle CSS into the page', () => {
+        const doc = sample();
+        const text = doc.pages[0].items.find((i) => i.kind === 'text')!;
+        const withBg = (background: unknown) => ({ ...doc, pages: [{ ...doc.pages[0], items: [{ ...text, background }] }] });
+        expect(() => validateDocument(withBg('url(https://example.com/pixel.png)'))).toThrow(FormatError);
+        expect(() => validateDocument(withBg('red; background-image: url(x)'))).toThrow(FormatError);
+        expect(validateDocument(withBg('#ffd43b80')).pages[0].items[0]).toMatchObject({ background: '#ffd43b80' });
+        expect(validateDocument(withBg(null)).pages[0].items[0]).toMatchObject({ background: null });
+        const stroke = doc.pages[0].items.find((i) => i.kind === 'stroke')!;
+        expect(() => validateDocument({ ...doc, pages: [{ ...doc.pages[0], items: [{ ...stroke, color: 'var(--x)' }] }] })).toThrow(FormatError);
+    });
+});

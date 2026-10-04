@@ -42,7 +42,15 @@ function oneOf<T extends string>(o: Obj, k: string, allowed: readonly T[], where
     if (typeof v !== 'string' || !allowed.includes(v as T)) throw new FormatError(`${where}: "${k}" has an unknown value.`);
     return v as T;
 }
-const nullableStr = (o: Obj, k: string, where: string) => (o[k] === null ? null : str(o, k, where));
+const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
+
+/** Colours end up in canvas styles and inline CSS, so only plain hex is allowed in a file. */
+function colour(o: Obj, k: string, where: string): string {
+    const v = str(o, k, where);
+    if (!HEX.test(v)) throw new FormatError(`${where}: "${k}" is not a hex colour.`);
+    return v;
+}
+const nullableColour = (o: Obj, k: string, where: string) => (o[k] === null ? null : colour(o, k, where));
 
 function rect(v: unknown, where: string) {
     if (!isObj(v)) throw new FormatError(`${where}: missing rectangle.`);
@@ -72,15 +80,15 @@ function item(v: unknown, where: string): Item {
         case 'text':
             return {
                 ...base, kind: 'text', text: str(v, 'text', where), fontSize: num(v, 'fontSize', where),
-                font: oneOf(v, 'font', ['sans', 'narrow', 'serif', 'mono'] as const, where), color: str(v, 'color', where),
-                background: nullableStr(v, 'background', where), padding: num(v, 'padding', where),
+                font: oneOf(v, 'font', ['sans', 'narrow', 'serif', 'mono'] as const, where), color: colour(v, 'color', where),
+                background: nullableColour(v, 'background', where), padding: num(v, 'padding', where),
                 align: oneOf(v, 'align', ['left', 'center', 'right'] as const, where),
             };
         case 'shape':
             return {
                 ...base, kind: 'shape', shape: oneOf(v, 'shape', ['rect', 'ellipse', 'line', 'arrow'] as const, where),
-                stroke: str(v, 'stroke', where), strokeWidth: num(v, 'strokeWidth', where),
-                fill: nullableStr(v, 'fill', where), flipX: bool(v, 'flipX', where), flipY: bool(v, 'flipY', where),
+                stroke: colour(v, 'stroke', where), strokeWidth: num(v, 'strokeWidth', where),
+                fill: nullableColour(v, 'fill', where), flipX: bool(v, 'flipX', where), flipY: bool(v, 'flipY', where),
             };
         case 'stroke': {
             const pts = v.points;
@@ -89,7 +97,7 @@ function item(v: unknown, where: string): Item {
             }
             return {
                 ...base, kind: 'stroke', tool: oneOf(v, 'tool', ['pen', 'highlighter'] as const, where),
-                color: str(v, 'color', where), size: num(v, 'size', where), points: pts as number[],
+                color: colour(v, 'color', where), size: num(v, 'size', where), points: pts as number[],
             };
         }
         default:
