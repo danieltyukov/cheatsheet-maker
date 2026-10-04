@@ -167,6 +167,13 @@ export function CanvasView({ assets, onResize, children }: Props) {
             scheduleRef.current();
         };
         const kd = key(true), ku = key(false);
+        const escape = (e: KeyboardEvent) => {
+            if (ctrl.key(e)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        window.addEventListener('keydown', escape, true);
         window.addEventListener('keydown', kd);
         window.addEventListener('keyup', ku);
 
@@ -177,6 +184,7 @@ export function CanvasView({ assets, onResize, children }: Props) {
             themeWatch.disconnect();
             scheme?.removeEventListener?.('change', onScheme);
             canvas.removeEventListener('wheel', onWheel);
+            window.removeEventListener('keydown', escape, true);
             window.removeEventListener('keydown', kd);
             window.removeEventListener('keyup', ku);
             cancelAnimationFrame(frame.current);
@@ -213,7 +221,8 @@ export function CanvasView({ assets, onResize, children }: Props) {
                 }}
                 onPointerMove={(e) => ctrl.move(info(e))}
                 onPointerUp={(e) => ctrl.up(info(e))}
-                onPointerCancel={() => ctrl.cancel()}
+                onPointerCancel={(e) => ctrl.cancel(e.pointerId)}
+                onLostPointerCapture={(e) => ctrl.cancel(e.pointerId)}
                 onPointerLeave={(e) => {
                     if (e.buttons === 0 && ctrl.hover) {
                         ctrl.hover = null;

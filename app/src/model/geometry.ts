@@ -143,8 +143,11 @@ function isLine(item: Item): item is ShapeItem {
     return item.kind === 'shape' && (item.shape === 'line' || item.shape === 'arrow');
 }
 
-/** Lines get two endpoint handles named after the corner they sit on; boxes get eight plus rotate. */
-export function handleAt(item: Item, p: Point, tol: number, rotateOffset: number): Handle | null {
+/**
+ * Lines get two endpoint handles named after the corner they sit on; boxes get eight plus rotate.
+ * `only` limits the search to the handles actually drawn for this item.
+ */
+export function handleAt(item: Item, p: Point, tol: number, rotateOffset: number, only?: readonly Handle[]): Handle | null {
     if (isLine(item)) {
         const [a, b] = lineEndpoints(item);
         if (Math.hypot(p.x - a.x, p.y - a.y) <= tol) return 'nw';
@@ -154,6 +157,7 @@ export function handleAt(item: Item, p: Point, tol: number, rotateOffset: number
     const pos = handlePositions(item, rotateOffset);
     const order: Handle[] = ['rotate', 'nw', 'ne', 'se', 'sw', 'n', 'e', 's', 'w'];
     for (const h of order) {
+        if (only && !only.includes(h)) continue;
         if (Math.hypot(p.x - pos[h].x, p.y - pos[h].y) <= tol) return h;
     }
     return null;

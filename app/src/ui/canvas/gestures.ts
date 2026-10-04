@@ -3,7 +3,7 @@ import { cropDrag } from '../../model/crop';
 import { createShapeItem, createStrokeItem, createTextItem } from '../../model/factory';
 import {
     boxBounds, boxFromLine, handleAt, hitItem, lineEndpoints, resizeBox, rotateBox, rotation, apply as applyM,
-    unionRect, type ResizeHandle,
+    unionRect, type Handle, type ResizeHandle,
 } from '../../model/geometry';
 import { itemsInRect, strokesTouched, topItemAt } from '../../model/hits';
 import { snapRect, snapTargets } from '../../model/snap';
@@ -40,6 +40,10 @@ type Drag =
     | { kind: 'pinch'; startDist: number; startMid: Point; view: View };
 
 const isLine = (i: Item): i is ShapeItem => i.kind === 'shape' && (i.shape === 'line' || i.shape === 'arrow');
+
+/** Text boxes only resize sideways (their height follows the text), so only those handles exist. */
+const TEXT_HANDLES: readonly Handle[] = ['w', 'e', 'rotate'];
+export const drawnHandles = (i: Item): readonly Handle[] | undefined => (i.kind === 'text' ? TEXT_HANDLES : undefined);
 
 export class GestureController {
     private pointers = new Map<number, Point>();
@@ -149,8 +153,11 @@ export class GestureController {
         }
         if (st.selection.length === 1) {
             const f = findItem(doc, st.selection[0]);
-            if (f && f.pageIndex === index && !f.item.locked) {
-                const h = handleAt(f.item, p, tol, isLine(f.item) ? -1e6 : this.px(24));
+            // Inside a small item every point is near some handle; there, a press means move.
+            const small = f && Math.min(f.item.w, f.item.h) * st.view.zoom < 4 * (e.pointerType === 'touch' ? 16 : 8);
+            const inside = f && hitItem(f.item, p, 0);
+            if (f && f.pageIndex === index && !f.item.locked && !(small && inside && !isLine(f.item))) {
+                const h = handleAt(f.item, p, tol, isLine(f.item) ? -1e6 : this.px(24), drawnHandles(f.item));
                 if (h && isLine(f.item)) {
                     const [a, b] = lineEndpoints(f.item);
                     this.drag = { kind: 'line-end', page: index, item: f.item, fixed: h === 'nw' ? b : a, movingIsA: h === 'nw', started: false };
@@ -401,7 +408,20 @@ export class GestureController {
         this.onChange();
     }
 
-    cancel() {
+    /** Escape: abandons a drag in progress. Returns whether the key was used. */
+    key(e: { key: string }): boolean {
+        if (e.key !== 'Escape' || !this.drag) return false;
+        this.cancel();
+        return true;
+    }
+
+    /**
+     * Abandons the current drag. With a pointer id (pointercancel, lost capture) only that pointer is
+     * forgotten; without one, every pointer is, so the rest of a cancelled drag is ignored.
+     */
+    cancel(pointerId?: number) {
+        if (pointerId === undefined) this.pointers.clear();
+        else this.pointers.delete(pointerId);
         const d = this.drag;
         this.drag = null;
         this.live = null;
@@ -427,7 +447,8 @@ export class GestureController {
         if (st.selection.length === 1) {
             const f = findItem(this.store.doc, st.selection[0]);
             if (f && f.pageIndex === index && !f.item.locked) {
-                const h = handleAt(f.item, p, this.px(8), isLine(f.item) ? -1e6 : this.px(24));
+                const small = Math.min(f.item.w, f.item.h) * st.view.zoom < 32;
+                const h = small && !isLine(f.item) && hitItem(f.item, p, 0) ? null : handleAt(f.item, p, this.px(8), isLine(f.item) ? -1e6 : this.px(24), drawnHandles(f.item));
                 if (h === 'rotate') cursor = 'grab';
                 else if (h) cursor = resizeCursor(h, f.item.rotation);
             }

@@ -6,7 +6,7 @@ import type { CheatDocument, Item, Point } from '../../model/types';
 import { drawItem } from '../../render/drawPage';
 import type { EditorAssets } from '../editorAssets';
 import type { EditorState } from '../store';
-import type { GestureController } from './gestures';
+import { drawnHandles, type GestureController } from './gestures';
 import { fromPagePoint, toScreen } from './viewport';
 
 export interface OverlayEnv {
@@ -144,7 +144,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, env: OverlayEnv): voi
             }
         } else {
             const pos = handlePositions(item, 24 / v.zoom);
-            const names: Handle[] = item.kind === 'text' ? ['w', 'e'] : ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+            const names: Handle[] = (drawnHandles(item) ?? ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']).filter((h) => h !== 'rotate');
             const top = scr(pageIndex, pos.n), rot = scr(pageIndex, pos.rotate);
             ctx.beginPath();
             ctx.moveTo(top.x, top.y);
