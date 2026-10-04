@@ -1,7 +1,7 @@
 import type { ImageFilters, Rect } from '../model/types';
 
 export interface RGBAImage {
-    data: Uint8ClampedArray;
+    data: Uint8ClampedArray<ArrayBuffer>;
     width: number;
     height: number;
 }
