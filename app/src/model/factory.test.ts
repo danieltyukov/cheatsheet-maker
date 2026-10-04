@@ -32,3 +32,10 @@ test('a stroke stores points relative to its padded bounds', () => {
     expect(s.h).toBe(44);
     expect(s.points).toEqual([2, 2, 0.5, 22, 42, 0.5]);
 });
+
+test('images from a HiDPI screen land at their on-screen size', () => {
+    const asset = { id: 'a', mime: 'image/png', width: 400, height: 200 };
+    const item = createImageItem(asset, { x: 0, y: 0 }, 1e6, 1e6, 2);
+    expect(item.w).toBe(150);
+    expect(item.h).toBe(75);
+});

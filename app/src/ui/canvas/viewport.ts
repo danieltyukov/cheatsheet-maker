@@ -60,6 +60,14 @@ export function fitWidth(setup: PageSetup, vw: number, page: number): View {
     return { zoom, scrollX: (w - vw / zoom) / 2, scrollY: page * stride(setup) - 16 / zoom };
 }
 
+/** The whole page in view with a small margin, centred both ways. */
+export function fitPage(setup: PageSetup, vw: number, vh: number, page: number): View {
+    const { w, h } = pageDimensions(setup);
+    const margin = Math.min(24, vw * 0.04);
+    const zoom = clampZoom(Math.min((vw - margin * 2) / w, (vh - margin * 2) / h));
+    return { zoom, scrollX: (w - vw / zoom) / 2, scrollY: page * stride(setup) + (h - vh / zoom) / 2 };
+}
+
 /** Keep some of the document on screen; centre it on an axis where it is smaller than the viewport. */
 export function clampView(v: View, setup: PageSetup, count: number, vw: number, vh: number): View {
     const { w } = pageDimensions(setup);

@@ -20,6 +20,7 @@ button:disabled { cursor: default; }
 .hl {
     position: relative;
     isolation: isolate;
+    color: var(--accent-ink);
 }
 .hl::before {
     content: '';

@@ -52,7 +52,8 @@ export function viewItems({ actions, mod, showGuides }: MenuContext): MenuItem[]
         { label: 'Zoom in', icon: 'zoomIn', shortcut: `${mod}+plus`, onSelect: () => actions.zoomBy(1.2) },
         { label: 'Zoom out', icon: 'zoomOut', shortcut: `${mod}+minus`, onSelect: () => actions.zoomBy(1 / 1.2) },
         { label: 'Actual size', shortcut: `${mod}+0`, onSelect: () => actions.zoomActual() },
-        { label: 'Fit width', shortcut: `${mod}+1`, onSelect: () => actions.zoomFit() },
+        { label: 'Fit page', shortcut: `${mod}+1`, onSelect: () => actions.zoomFit() },
+        { label: 'Fit width', onSelect: () => actions.zoomFitWidth() },
         'separator',
         { label: 'Show margins and columns', checked: showGuides, onSelect: () => actions.store.patch({ showGuides: !showGuides }) },
     ];

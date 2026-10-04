@@ -125,7 +125,7 @@
 }
 .page-card.is-current .page-thumb { outline-color: var(--ink); }
 .page-meta { display: flex; align-items: center; justify-content: space-between; }
-.page-num { padding: 0 6px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.page-num { padding: 0 9px; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .add-page { justify-self: start; }
 
 /* Phone */
@@ -151,14 +151,17 @@
     transform: skewX(-6deg) rotate(-2deg);
 }
 .dialog.sheet {
-    width: 100vw;
+    inset: auto 0 0 0;
+    width: 100%;
     max-width: none;
     max-height: 72dvh;
-    margin: auto 0 0;
+    margin: 0;
+    overflow: hidden;
+    border-width: 1px 0 0;
     border-radius: 14px 14px 0 0;
-    border-bottom: 0;
 }
-.dialog.sheet .dialog-body { padding: 0; }
+.dialog.sheet .dialog-inner { max-height: 72dvh; }
+.dialog.sheet .dialog-body { padding: 0 0 env(safe-area-inset-bottom); }
 
 /* Shortcut sheet */
 .shortcuts-dialog { width: min(720px, calc(100vw - 32px)); }

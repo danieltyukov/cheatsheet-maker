@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { clampView, fitWidth, pageAt, pageTops, toPagePoint, toScreen, toWorld, visiblePages, zoomAround } from './viewport';
+import { clampView, fitPage, fitWidth, pageAt, pageTops, toPagePoint, toScreen, toWorld, visiblePages, zoomAround } from './viewport';
 import { DEFAULT_SETUP } from '../../model/factory';
 
 const setup = { ...DEFAULT_SETUP, size: 'Letter' as const }; // 612 x 792
@@ -46,4 +46,14 @@ test('fit width centres the page', () => {
 test('clampView centres content narrower than the viewport', () => {
     const v = clampView({ zoom: 0.5, scrollX: 500, scrollY: 0 }, setup, 1, 1000, 800);
     expect(toScreen(v, { x: 306, y: 0 }).x).toBeCloseTo(500);
+});
+
+test('fit page shows the whole page, centred', () => {
+    const v = fitPage(setup, 1000, 600, 0);
+    const top = toScreen(v, { x: 0, y: 0 });
+    const bottom = toScreen(v, { x: 612, y: 792 });
+    expect(top.y).toBeGreaterThanOrEqual(0);
+    expect(bottom.y).toBeLessThanOrEqual(600);
+    expect(top.x).toBeCloseTo(1000 - bottom.x);
+    expect(top.y).toBeCloseTo(600 - bottom.y);
 });

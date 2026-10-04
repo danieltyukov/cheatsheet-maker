@@ -52,3 +52,9 @@ test('a box narrower than one character still lays out (one character per line)'
     const out = layoutText(parseMarkdown('ab'), opts({ width: 2 }));
     expect(texts(out.runs).map((r) => r.text)).toEqual(['a', 'b']);
 }, 2000);
+
+test('display math is centred even in a left-aligned box', () => {
+    const out = layoutText(parseMarkdown('$$yy$$'), opts({ align: 'left' }));
+    const m = out.runs.find((r) => r.kind === 'math')!;
+    expect(m.x).toBeCloseTo((100 - 10) / 2);
+});

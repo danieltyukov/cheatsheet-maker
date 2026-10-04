@@ -70,3 +70,10 @@ describe('packPage arrange', () => {
         expect(packPage(doc, 0, null, 'fit', 4)).toBe(doc);
     });
 });
+
+test('a stroke that is not inside any item is packed as its own box, so nothing overlaps', () => {
+    const a = createImageItem(asset(400, 300), { x: 300, y: 400 }, 1e6, 1e6);
+    const free = createStrokeItem([20, 20, 0.5, 200, 60, 0.5], 'pen', '#000', 2);
+    const doc = packPage(addItems(createDocument('t', 0), 0, [a, free]), 0, null, 'fit', 4);
+    noOverlap(doc.pages[0].items);
+});

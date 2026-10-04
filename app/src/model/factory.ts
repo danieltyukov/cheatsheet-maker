@@ -35,9 +35,10 @@ export function createDocument(title = 'Untitled cheatsheet', now = Date.now()):
     };
 }
 
-export function createImageItem(asset: AssetMeta, center: Point, maxW: number, maxH: number): ImageItem {
-    let w = asset.width * PX_TO_PT;
-    let h = asset.height * PX_TO_PT;
+/** `pixelRatio` is the screen's device pixel ratio for screenshots, so they land at their on-screen size. */
+export function createImageItem(asset: AssetMeta, center: Point, maxW: number, maxH: number, pixelRatio = 1): ImageItem {
+    let w = (asset.width * PX_TO_PT) / pixelRatio;
+    let h = (asset.height * PX_TO_PT) / pixelRatio;
     const fit = Math.min(1, maxW / w, maxH / h);
     w *= fit;
     h *= fit;

@@ -162,7 +162,8 @@ export function layoutText(blocks: Block[], o: LayoutOptions): TextLayout {
             const m = o.math(b.tex, true, o.fontSize) ?? placeholder(o.fontSize * 1.2);
             const scale = Math.min(1, o.width / m.width);
             const w = m.width * scale, h = (m.ascent + m.depth) * scale;
-            const x = o.align === 'left' ? 0 : o.align === 'right' ? o.width - w : (o.width - w) / 2;
+            // Display formulas are centred whatever the paragraph alignment, as in print.
+            const x = (o.width - w) / 2;
             y += o.fontSize * 0.2;
             runs.push({ kind: 'math', x, top: y, w, h, tex: b.tex, display: true });
             y += h + o.fontSize * 0.2;

@@ -6,7 +6,7 @@ import { isEditableTarget } from '../shortcuts';
 import { useStore, type View } from '../store';
 import { GestureController, type PointerInfo } from './gestures';
 import { drawOverlay } from './overlay';
-import { clampView, fitWidth, pageAt, pageTops, toScreen, toWorld, visiblePages, zoomAround } from './viewport';
+import { clampView, fitPage, pageAt, pageTops, toScreen, toWorld, visiblePages, zoomAround } from './viewport';
 import './canvas.css';
 
 interface Props {
@@ -127,11 +127,18 @@ export function CanvasView({ assets, onResize, children }: Props) {
             const st = store.getState();
             const v = st.view;
             if (first && r.width > 0 && v.zoom === 1 && v.scrollX === 0 && v.scrollY === 0) {
-                store.setView(fitWidth(st.history.present.setup, r.width, st.currentPage));
+                store.setView(fitPage(st.history.present.setup, r.width, r.height, st.currentPage));
             }
             scheduleRef.current();
         });
         ro.observe(wrap);
+
+        // Canvas colours come from CSS variables, so a theme change needs a redraw.
+        const themeWatch = new MutationObserver(() => scheduleRef.current());
+        themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        const scheme = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+        const onScheme = () => scheduleRef.current();
+        scheme?.addEventListener?.('change', onScheme);
 
         const onWheel = (e: WheelEvent) => {
             e.preventDefault();
@@ -167,6 +174,8 @@ export function CanvasView({ assets, onResize, children }: Props) {
         return () => {
             unsubscribe();
             ro.disconnect();
+            themeWatch.disconnect();
+            scheme?.removeEventListener?.('change', onScheme);
             canvas.removeEventListener('wheel', onWheel);
             window.removeEventListener('keydown', kd);
             window.removeEventListener('keyup', ku);

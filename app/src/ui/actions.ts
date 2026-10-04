@@ -3,9 +3,8 @@ import {
     removePage, reorderItems, translateItems, updateItems, type ItemPatch, type Reorder,
 } from '../model/commands';
 import { createImageItem, createTextItem, DEFAULT_FILTERS } from '../model/factory';
-import { FormatError, packCheatsheet, unpackCheatsheet, type AssetBytes } from '../model/format';
+import { FormatError, packCheatsheet, type AssetBytes } from '../model/format';
 import { alignItems, distributeItems, packPage, type AlignMode, type PackMode } from '../model/layout';
-import { importLegacyAutosave } from '../model/legacy';
 import { pageDimensions, printableArea } from '../model/pageSizes';
 import type { AssetMeta, CheatDocument, Id, ImageItem, Item, Point, Rect } from '../model/types';
 import { classifyFile } from '../platform/classify';
@@ -16,9 +15,10 @@ import { ensureFontsLoaded } from '../render/fonts';
 import { findTrimRect } from '../render/filters';
 import { browserPdfDeps } from '../render/rasterize';
 import type { LibraryApi } from '../storage/library';
-import { ACTUAL_SIZE, clampView, fitWidth, pageTops, zoomAround } from './canvas/viewport';
+import { ACTUAL_SIZE, clampView, fitPage, fitWidth, pageTops, zoomAround } from './canvas/viewport';
 import type { EditorAssets } from './editorAssets';
 import { decodeImage } from './importImage';
+import { openDocumentFile } from './openFile';
 import type { Command } from './shortcuts';
 import type { EditorStore } from './store';
 import { zipSync } from 'fflate';
@@ -64,12 +64,10 @@ export class Actions {
                 else if (kind === 'pdf') {
                     this.pendingPdf = f;
                     this.store.openDialog('pdf-import');
-                } else if (kind === 'cheatsheet') {
-                    const { doc, assets } = unpackCheatsheet(new Uint8Array(await f.arrayBuffer()));
-                    await this.openImported(doc, assets);
-                } else if (kind === 'legacy-json') {
-                    const { doc, assets } = await importLegacyAutosave(await f.text(), f.name.replace(/\.json$/i, ''));
-                    await this.openImported(doc, assets);
+                } else if (kind === 'cheatsheet' || kind === 'legacy-json') {
+                    const stored = await openDocumentFile(f, this.library);
+                    this.onOpenDocument(stored);
+                    this.store.toast(`Opened "${stored.title}".`);
                 } else {
                     this.store.toast(`${f.name} is not something Cheatsheet Maker can open.`, 'error');
                 }
@@ -78,12 +76,6 @@ export class Actions {
             }
         }
         if (images.length) await this.importImages(images, at);
-    }
-
-    private async openImported(doc: CheatDocument, assets: AssetBytes) {
-        const stored = await this.library.importDocument(doc, assets);
-        this.onOpenDocument(stored);
-        this.store.toast(`Opened "${stored.title}".`);
     }
 
     async importImages(blobs: Blob[], at?: Drop): Promise<void> {
@@ -98,15 +90,23 @@ export class Actions {
                 this.assets.images.prime(id, img.bitmap);
                 const meta = { id, mime: img.mime, width: img.width, height: img.height };
                 metas.push(meta);
-                items.push(createImageItem(meta, { x: point.x + n * 16, y: point.y + n * 16 }, area.w, area.h));
+                // Screenshots arrive at device pixels; place them at their on-screen size, and no wider than
+                // 60% of the printable area so a paste never swamps the sheet.
+                const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+                items.push(createImageItem(meta, { x: point.x + n * 16, y: point.y + n * 16 }, area.w * 0.6, area.h * 0.6, dpr));
             } catch (e) {
                 this.error(e);
             }
         }
         if (!items.length) return;
-        this.store.apply((d) => addItems(metas.reduce(addAsset, d), page, items));
+        const ids = items.map((i) => i.id);
+        // Several images at once are laid out side by side instead of in a pile.
+        this.store.apply((d) => {
+            const added = addItems(metas.reduce(addAsset, d), page, items);
+            return items.length > 1 ? packPage(added, page, ids, 'arrange', this.store.getState().packGap) : added;
+        });
         this.store.setTool('select');
-        this.store.select(items.map((i) => i.id));
+        this.store.select(ids);
     }
 
     /** Regions are in PDF points on a page rasterised at `dpi`; the raster is stored once. */
@@ -281,7 +281,8 @@ export class Actions {
     }
     zoomBy(f: number) { this.setView(zoomAround(this.store.getState().view, f, { x: this.viewport.w / 2, y: this.viewport.h / 2 })); }
     zoomActual() { this.zoomBy(ACTUAL_SIZE / this.store.getState().view.zoom); }
-    zoomFit() { this.setView(fitWidth(this.doc.setup, this.viewport.w, this.page)); }
+    zoomFit() { this.setView(fitPage(this.doc.setup, this.viewport.w, this.viewport.h, this.page)); }
+    zoomFitWidth() { this.setView(fitWidth(this.doc.setup, this.viewport.w, this.page)); }
 
     // Export
 

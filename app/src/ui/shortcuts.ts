@@ -67,5 +67,5 @@ export const SHORTCUT_LIST: Array<{ group: string; items: Array<[string, string]
     { group: 'Tools', items: [['V', 'Select'], ['H or hold Space', 'Hand'], ['P or D', 'Pen'], ['M', 'Highlighter'], ['E', 'Eraser'], ['T', 'Text'], ['R, O, L, A', 'Rectangle, ellipse, line, arrow'], ['C', 'Crop the selected image']] },
     { group: 'Edit', items: [['Mod+Z', 'Undo'], ['Mod+Shift+Z or Mod+Y', 'Redo'], ['Mod+C, X, V', 'Copy, cut, paste'], ['Mod+D', 'Duplicate'], ['Delete', 'Delete'], ['Arrows', 'Nudge 1 pt (Shift: 10 pt)'], ['Mod+A', 'Select all on the page'], ['Mod+] and Mod+[', 'Forward and backward (Shift: to front, to back)']] },
     { group: 'File', items: [['Mod+O', 'Import images'], ['Mod+Shift+O', 'Import from a PDF'], ['Mod+S', 'Save a .cheatsheet file'], ['Mod+E', 'Export PDF'], ['Mod+Shift+E', 'Export PNG']] },
-    { group: 'View', items: [['Mod+plus, minus, 0', 'Zoom in, out, 100%'], ['Mod+1', 'Fit width'], ['Mod+Enter', 'Add a page'], ['?', 'This sheet']] },
+    { group: 'View', items: [['Mod+plus, minus, 0', 'Zoom in, out, 100%'], ['Mod+1', 'Fit the page in view'], ['Mod+Enter', 'Add a page'], ['?', 'This sheet']] },
 ];

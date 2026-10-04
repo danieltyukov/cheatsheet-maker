@@ -7,9 +7,9 @@ import type { CheatDocument, Id, Item, Page, Rect } from './types';
 
 export type PackMode = 'arrange' | 'fit';
 
-export function isPackable(i: Item): boolean {
-    if (i.locked) return false;
-    return i.kind === 'image' || i.kind === 'text' || (i.kind === 'shape' && (i.shape === 'rect' || i.shape === 'ellipse'));
+/** Strokes, lines and arrows mark up other items; they move with the item they sit inside. */
+export function isAnnotation(i: Item): boolean {
+    return i.kind === 'stroke' || (i.kind === 'shape' && (i.shape === 'line' || i.shape === 'arrow'));
 }
 
 /** Map `item` so that the rectangle `from` lands on placement `to` inside `area`. */
@@ -31,25 +31,26 @@ export function packPage(doc: CheatDocument, pageIndex: number, ids: Id[] | null
     const page = doc.pages[pageIndex];
     if (!page) return doc;
     const pick = ids ? new Set(ids) : null;
-    const packed = page.items.filter((i) => isPackable(i) && (!pick || pick.has(i.id)));
-    if (packed.length === 0) return doc;
-    const bounds = new Map(packed.map((i) => [i.id, boxBounds(i)]));
+    const chosen = (i: Item) => !i.locked && (!pick || pick.has(i.id));
+    const hosts = page.items.filter((i) => chosen(i) && !isAnnotation(i));
 
-    // Strokes, lines and arrows drawn inside one packed item travel with it.
+    // An annotation inside one host travels with it; any other annotation is packed as a box of its own.
     const owner = new Map<Id, Id>();
     for (const a of page.items) {
-        if (isPackable(a) || a.locked || a.kind === 'image' || a.kind === 'text') continue;
-        if (a.kind === 'shape' && (a.shape === 'rect' || a.shape === 'ellipse')) continue;
+        if (a.locked || !isAnnotation(a)) continue;
         const ab = boxBounds(a);
         let best: Rect | null = null;
-        for (const p of packed) {
-            const pb = bounds.get(p.id)!;
+        for (const p of hosts) {
+            const pb = boxBounds(p);
             if (rectContains(pb, ab, 1) && (!best || pb.w * pb.h < best.w * best.h)) {
                 best = pb;
                 owner.set(a.id, p.id);
             }
         }
     }
+    const packed = page.items.filter((i) => chosen(i) && !owner.has(i.id));
+    if (packed.length === 0) return doc;
+    const bounds = new Map(packed.map((i) => [i.id, boxBounds(i)]));
 
     const area = printableArea(doc.setup);
     const boxes = packed.map((i) => ({ id: i.id, w: bounds.get(i.id)!.w, h: bounds.get(i.id)!.h }));
