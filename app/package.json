@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tauri": "vite --mode tauri",
     "build": "tsc --noEmit -p . && vite build",
+    "build:tauri": "tsc --noEmit -p . && vite build --mode tauri",
+    "build:e2e": "vite build --mode e2e",
     "preview": "vite preview --port 4173 --strictPort",
     "tauri": "tauri",
     "e2e": "playwright test"

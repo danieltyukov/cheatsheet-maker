@@ -12,6 +12,8 @@ import { EditorAssets } from './editorAssets';
 import { LibraryScreen } from './library/LibraryScreen';
 import { loadPrefs, pickPrefs, samePrefs, savePrefs, type Prefs } from './prefs';
 import { EditorStore, StoreContext } from './store';
+import { registerPwa } from '../pwa';
+import { Toasts } from './components/Toasts';
 import { syncTextHeights } from './syncTextHeights';
 import { renderThumbnail } from './thumbnail';
 import { isDocumentFile, openDocumentFile } from './openFile';
@@ -86,6 +88,10 @@ function EditorHost({ boot, doc, files, toLibrary, open, importLegacy, exposeSav
         return { store, assets, actions };
     });
     const { store, assets, actions } = env;
+
+    useEffect(() => {
+        if (import.meta.env.MODE === 'e2e') (window as unknown as { __cm: unknown }).__cm = { store, actions, assets };
+    }, [store, actions, assets]);
 
     useEffect(() => {
         actions.onOpenDocument = (d) => onLeave(() => open(d));
@@ -172,6 +178,7 @@ export function App() {
     const [boot, setBoot] = useState<Boot | null>(null);
     const [mode, setMode] = useState<Mode>({ kind: 'loading' });
     const [libraryError, setLibraryError] = useState<string | null>(null);
+    const [update, setUpdate] = useState<(() => void) | null>(null);
     const saver = useRef<Autosaver | null>(null);
 
     useEffect(() => {
@@ -185,6 +192,8 @@ export function App() {
             cancelled = true;
         };
     }, []);
+
+    useEffect(() => registerPwa((reload) => setUpdate(() => reload)), []);
 
     const exposeSaver = useCallback((s: Autosaver | null) => {
         saver.current = s;
@@ -254,11 +263,29 @@ export function App() {
         if (problems.length) setLibraryError(problems.join(' '));
     }, [boot]);
 
+    // Chromium desktop hands over .cheatsheet files opened from the operating system.
+    useEffect(() => {
+        if (!boot) return;
+        const lq = (window as unknown as { launchQueue?: { setConsumer(cb: (p: { files?: Array<{ getFile(): Promise<File> }> }) => void): void } }).launchQueue;
+        lq?.setConsumer((p) => {
+            if (p.files?.length) void Promise.all(p.files.map((f) => f.getFile())).then((files) => onLeave(() => void importFromLibrary(files)));
+        });
+    }, [boot, importFromLibrary, onLeave]);
+
+    const updateToast = update && (
+        <Toasts
+            toasts={[{ id: -1, message: 'A new version of Cheatsheet Maker is ready.', kind: 'info', action: { label: 'Reload', run: update } }]}
+            onDismiss={() => setUpdate(null)}
+        />
+    );
+
     if (!boot || mode.kind === 'loading') {
         return <div className="boot" aria-busy="true">Opening your cheatsheets</div>;
     }
     if (mode.kind === 'library') {
         return (
+            <>
+            {updateToast}
             <LibraryScreen
                 library={boot.library}
                 platform={boot.platform}
@@ -271,9 +298,12 @@ export function App() {
                 storageWarning={boot.persistent ? undefined : boot.reason}
                 error={libraryError}
             />
+            </>
         );
     }
     return (
+        <>
+        {updateToast}
         <EditorHost
             key={mode.doc.id}
             boot={boot}
@@ -285,5 +315,6 @@ export function App() {
             importLegacy={(onError) => void importLegacy(onError)}
             exposeSaver={exposeSaver}
         />
+        </>
     );
 }
