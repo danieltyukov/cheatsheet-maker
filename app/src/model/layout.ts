@@ -1,5 +1,5 @@
-import { setItemBox } from './commands';
-import { boxBounds, rectContains } from './geometry';
+import { findItem, setItemBox, translateItems } from './commands';
+import { boxBounds, rectContains, unionRect } from './geometry';
 import { newId } from './ids';
 import { arrange, fitScale, type Placement } from './pack';
 import { printableArea } from './pageSizes';
@@ -76,4 +76,46 @@ export function packPage(doc: CheatDocument, pageIndex: number, ids: Id[] | null
     const pages = [...doc.pages];
     pages.splice(pageIndex, 1, ...newPages);
     return { ...doc, pages };
+}
+
+export type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+
+export function alignItems(doc: CheatDocument, ids: Id[], mode: AlignMode): CheatDocument {
+    const found = ids.map((id) => findItem(doc, id)).filter((f): f is NonNullable<typeof f> => f !== null && !f.item.locked);
+    if (found.length === 0) return doc;
+    const target = found.length === 1 ? printableArea(doc.setup) : unionRect(found.map((f) => boxBounds(f.item)))!;
+    let out = doc;
+    for (const f of found) {
+        const b = boxBounds(f.item);
+        let dx = 0, dy = 0;
+        if (mode === 'left') dx = target.x - b.x;
+        if (mode === 'hcenter') dx = target.x + target.w / 2 - (b.x + b.w / 2);
+        if (mode === 'right') dx = target.x + target.w - (b.x + b.w);
+        if (mode === 'top') dy = target.y - b.y;
+        if (mode === 'vcenter') dy = target.y + target.h / 2 - (b.y + b.h / 2);
+        if (mode === 'bottom') dy = target.y + target.h - (b.y + b.h);
+        out = translateItems(out, [f.item.id], dx, dy);
+    }
+    return out;
+}
+
+export function distributeItems(doc: CheatDocument, ids: Id[], axis: 'h' | 'v'): CheatDocument {
+    const found = ids.map((id) => findItem(doc, id)).filter((f): f is NonNullable<typeof f> => f !== null && !f.item.locked);
+    if (found.length < 3) return doc;
+    const withBounds = found.map((f) => ({ id: f.item.id, b: boxBounds(f.item) }));
+    const start = (r: Rect) => (axis === 'h' ? r.x : r.y);
+    const size = (r: Rect) => (axis === 'h' ? r.w : r.h);
+    withBounds.sort((a, b) => start(a.b) - start(b.b));
+    const first = withBounds[0].b, last = withBounds[withBounds.length - 1].b;
+    const span = start(last) + size(last) - start(first);
+    const total = withBounds.reduce((a, x) => a + size(x.b), 0);
+    const gap = (span - total) / (withBounds.length - 1);
+    let cursor = start(first);
+    let out = doc;
+    for (const { id, b } of withBounds) {
+        const d = cursor - start(b);
+        out = axis === 'h' ? translateItems(out, [id], d, 0) : translateItems(out, [id], 0, d);
+        cursor += size(b) + gap;
+    }
+    return out;
 }
