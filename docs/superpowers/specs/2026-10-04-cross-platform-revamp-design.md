@@ -120,8 +120,9 @@ cheap.
 IndexedDB through `idb`:
 
 - `docs`: one record per document (the JSON above) plus a small thumbnail.
-- `assets`: blobs keyed by SHA-256, shared across documents, reference
-  counted at save time and garbage collected when a document is deleted.
+- `assets`: image bytes keyed by SHA-256, shared across documents, and
+  garbage collected (by scanning the stored documents) when a document is
+  deleted.
 - `meta`: last opened document, preferences.
 
 Autosave runs 500 ms after the last edit. The status indicator reads Saved,
@@ -270,7 +271,7 @@ and applied identically on screen and in exports.
   multiply blend mode. Text and math boxes are rasterised at the export DPI
   (setting, default 300). Every page has the document's page size.
 - PNG: the current page or all pages, at a chosen DPI. Several pages are
-  saved one file per page (zipped on the web).
+  saved as one PNG per page inside a zip.
 - Print check: a panel that lists images whose effective resolution on the
   page is under 150 DPI and text under 5 pt, each with a button that selects
   the item. An Actual size zoom shows the page at its physical size.
