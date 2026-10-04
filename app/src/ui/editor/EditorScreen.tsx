@@ -3,6 +3,7 @@ import { findItem } from '../../model/commands';
 import type { Actions } from '../actions';
 import { CanvasView } from '../canvas/CanvasView';
 import { pageAt, toPagePoint, toWorld } from '../canvas/viewport';
+import { Button } from '../components/Button';
 import { Dialog } from '../components/Dialog';
 import { IconButton } from '../components/IconButton';
 import { MenuButton } from '../components/Menu';
@@ -67,6 +68,8 @@ export function EditorScreen({ actions, assets, onOpenLibrary }: Props) {
     const wide = useMediaQuery('(min-width: 1100px)');
     const coarse = useMediaQuery('(pointer: coarse)');
     const toasts = useEditor((s) => s.toasts);
+    const saveStatus = useEditor((s) => s.saveStatus);
+    const [leaving, setLeaving] = useState(false);
     const [sheet, setSheet] = useState<'pages' | 'inspect' | null>(null);
     const [pagesOpen, setPagesOpen] = useState(false);
     const [dropping, setDropping] = useState(false);
@@ -145,12 +148,32 @@ export function EditorScreen({ actions, assets, onOpenLibrary }: Props) {
         void actions.importFiles(files, at);
     };
 
+    // Closing the tab while saves fail would lose work, so the browser asks first.
+    const unsaved = saveStatus.state === 'error';
+    useEffect(() => {
+        if (!unsaved) return;
+        const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+        window.addEventListener('beforeunload', warn);
+        return () => window.removeEventListener('beforeunload', warn);
+    }, [unsaved]);
+
+    // Going to the library reloads this document from storage, which lacks the failed changes.
+    // Without storage at all the library is in memory too, and nothing is lost by going there.
+    const leave = () => {
+        if (saveStatus.state === 'error' && !saveStatus.keptInMemory) setLeaving(true);
+        else onOpenLibrary();
+    };
+    const leaveNow = () => {
+        setLeaving(false);
+        onOpenLibrary();
+    };
+
     const showPages = desktop && (wide || pagesOpen);
     return (
         <div className={`editor ${desktop ? 'is-desktop' : 'is-phone'} ${showPages ? 'with-pages' : ''}`}>
             <TopBar
                 actions={actions}
-                onOpenLibrary={onOpenLibrary}
+                onOpenLibrary={leave}
                 phone={!desktop}
                 coarse={coarse}
                 isMac={isMac}
@@ -201,6 +224,21 @@ export function EditorScreen({ actions, assets, onOpenLibrary }: Props) {
             <PdfImportDialog actions={actions} />
             <PrintCheckDialog actions={actions} />
             <ShortcutsDialog isMac={isMac} />
+            <Dialog
+                open={leaving}
+                title="Your changes are not saved"
+                onClose={() => setLeaving(false)}
+                footer={(
+                    <>
+                        <Button onClick={() => setLeaving(false)}>Stay</Button>
+                        <Button onClick={leaveNow}>Leave anyway</Button>
+                        <Button variant="primary" onClick={() => void actions.saveCheatsheet().then((saved) => saved && leaveNow())}>Save a .cheatsheet file</Button>
+                    </>
+                )}
+            >
+                <p>{saveStatus.state === 'error' ? saveStatus.message : ''}</p>
+                <p>Leaving now loses the changes made since the last successful save.</p>
+            </Dialog>
         </div>
     );
 }

@@ -1,6 +1,7 @@
 import type { CheatDocument } from '../model/types';
 
-export type SaveStatus = { state: 'saved'; at: number } | { state: 'saving' } | { state: 'error'; message: string };
+/** `keptInMemory`: there is no storage at all, so the whole library lives in this tab until it closes. */
+export type SaveStatus = { state: 'saved'; at: number } | { state: 'saving' } | { state: 'error'; message: string; keptInMemory?: boolean };
 
 export function describeStorageError(e: unknown): string {
     const name = (e as { name?: string })?.name;

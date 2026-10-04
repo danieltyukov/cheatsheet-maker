@@ -4,8 +4,8 @@ import { importLegacyAutosave } from '../model/legacy';
 import type { CheatDocument, Id } from '../model/types';
 import { getPlatform, type Platform } from '../platform';
 import { ensureFontsLoaded } from '../render/fonts';
-import { createAutosaver, type Autosaver } from '../storage/autosave';
-import { openLibrary, type LibraryApi } from '../storage/library';
+import { createAutosaver, describeStorageError, type Autosaver } from '../storage/autosave';
+import { MemoryLibrary, openLibrary, type LibraryApi } from '../storage/library';
 import { Actions } from './actions';
 import { EditorScreen } from './editor/EditorScreen';
 import { EditorAssets } from './editorAssets';
@@ -15,6 +15,7 @@ import { EditorStore, StoreContext } from './store';
 import { registerPwa } from '../pwa';
 import { Toasts } from './components/Toasts';
 import { syncTextHeights } from './syncTextHeights';
+import { createSaveReporter } from './saveStatus';
 import { renderThumbnail } from './thumbnail';
 import { isDocumentFile, openDocumentFile } from './openFile';
 
@@ -37,21 +38,30 @@ const fontsReady = ensureFontsLoaded();
  */
 let startup: Promise<{ boot: Boot; doc: CheatDocument | null }> | null = null;
 
+async function start(library: LibraryApi, persistent: boolean, reason: string | undefined, platform: Platform) {
+    const prefs = await loadPrefs(library);
+    const legacyText = await platform.readLegacyAutosave().catch(() => null);
+    const legacy = legacyText && !(await library.getMeta<boolean>('legacyOffered')) ? legacyText : null;
+    let doc: CheatDocument | null = null;
+    const last = await library.getMeta<Id>('lastDoc');
+    if (last) doc = await library.get(last);
+    if (!doc && (await library.list()).length === 0) {
+        doc = createDocument();
+        await library.put(doc, null);
+    }
+    void library.gc().catch(() => undefined);
+    return { boot: { library, platform, persistent, reason, prefs, legacy }, doc };
+}
+
 function startOnce() {
     startup ??= (async () => {
         const [{ library, persistent, reason }, platform] = await Promise.all([openLibrary(), getPlatform()]);
-        const prefs = await loadPrefs(library);
-        const legacyText = await platform.readLegacyAutosave();
-        const legacy = legacyText && !(await library.getMeta<boolean>('legacyOffered')) ? legacyText : null;
-        let doc: CheatDocument | null = null;
-        const last = await library.getMeta<Id>('lastDoc');
-        if (last) doc = await library.get(last);
-        if (!doc && (await library.list()).length === 0) {
-            doc = createDocument();
-            await library.put(doc, null);
+        try {
+            return await start(library, persistent, reason, platform);
+        } catch (e) {
+            // Storage opened and then failed: carry on in memory, and say so.
+            return start(new MemoryLibrary(), false, describeStorageError(e), platform);
         }
-        void library.gc().catch(() => undefined);
-        return { boot: { library, platform, persistent, reason, prefs, legacy }, doc };
     })();
     return startup;
 }
@@ -75,16 +85,17 @@ interface HostProps {
 function EditorHost({ boot, doc, files, toLibrary, open, importLegacy, exposeSaver, onLeave }: HostProps) {
     const [env] = useState(() => {
         const store = new EditorStore(doc, boot.prefs);
-        // Assigned right after; the callback only runs once something has loaded.
+        // Assigned right after; the callbacks only run once something is drawn or has loaded.
         let assets: EditorAssets;
+        let actions: Actions;
         assets = new EditorAssets(
-            (id) => boot.library.getAsset(id),
+            (id) => actions.getAsset(id),
             () => {
                 syncTextHeights(store, (i) => assets.textHeight(i));
                 store.bumpRender();
             },
         );
-        const actions = new Actions(store, assets, boot.library, boot.platform);
+        actions = new Actions(store, assets, boot.library, boot.platform);
         return { store, assets, actions };
     });
     const { store, assets, actions } = env;
@@ -108,17 +119,11 @@ function EditorHost({ boot, doc, files, toLibrary, open, importLegacy, exposeSav
 
     useEffect(() => {
         const { library } = boot;
-        const report = boot.persistent
-            ? (s: Parameters<EditorStore['setSaveStatus']>[0]) => store.setSaveStatus(s)
-            : (s: Parameters<EditorStore['setSaveStatus']>[0]) => {
-                // Without IndexedDB the in-memory copy is not a save, so keep saying so.
-                if (s.state === 'error') store.setSaveStatus(s);
-            };
-        if (!boot.persistent) {
-            store.setSaveStatus({ state: 'error', message: boot.reason ?? 'Browser storage is unavailable.' });
-            store.toast(`${boot.reason ?? 'Browser storage is unavailable.'} Save a .cheatsheet file to keep your work.`, 'error');
-        }
-        const saver = createAutosaver(async (d) => library.put(d, await renderThumbnail(d, assets)), report);
+        const report = createSaveReporter(store, boot.persistent, boot.reason);
+        const saver = createAutosaver(async (d) => {
+            await actions.flushAssets();
+            await library.put(d, await renderThumbnail(d, assets));
+        }, report);
         exposeSaver(saver);
         void library.setMeta('lastDoc', doc.id);
 
@@ -165,7 +170,7 @@ function EditorHost({ boot, doc, files, toLibrary, open, importLegacy, exposeSav
             saver.dispose();
             exposeSaver(null);
         };
-    }, [boot, doc.id, store, assets, exposeSaver, importLegacy]);
+    }, [boot, doc.id, store, assets, actions, exposeSaver, importLegacy]);
 
     return (
         <StoreContext.Provider value={store}>

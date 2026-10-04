@@ -4,7 +4,7 @@ import { Actions } from './actions';
 import { EditorStore } from './store';
 import { EditorAssets } from './editorAssets';
 import { MemoryLibrary } from '../storage/library';
-import { addItems } from '../model/commands';
+import { addAsset, addItems } from '../model/commands';
 import { createDocument, createImageItem, createShapeItem } from '../model/factory';
 import type { Platform } from '../platform';
 
@@ -101,4 +101,26 @@ test('auto-trim works on an image whose crop is not on whole pixels', () => {
     expect(() => actions.trimSelected()).not.toThrow();
     const out = store.doc.pages[0].items.find((i) => i.id === img.id)!;
     expect(out.kind === 'image' && out.crop).toEqual({ x: 58, y: 28, w: 84, h: 44 });
+});
+
+test('when storage is full, new images stay in memory until a save gets them in, and go into a saved file', async () => {
+    const full = new MemoryLibrary();
+    full.putAsset = async () => { throw Object.assign(new Error('full'), { name: 'QuotaExceededError' }); };
+    const save = vi.fn(async (_name: string, _blob: Blob) => 'saved' as const);
+    const a = new Actions(store, new EditorAssets(async () => null, () => {}), full, { ...platform, saveFile: save });
+    const bytes = new Uint8Array([137, 80, 78, 71, 1, 2, 3, 4]);
+    const id = await a.storeAsset(bytes, 'image/png');
+    expect(await a.getAsset(id)).not.toBeNull();
+    // Autosave goes through flushAssets first, so it keeps reporting the failure.
+    await expect(a.flushAssets()).rejects.toThrow('full');
+    const img = createImageItem({ id, mime: 'image/png', width: 4, height: 4 }, { x: 50, y: 50 }, 100, 100);
+    store.apply((d) => addAsset(addItems(d, 0, [img]), { id, mime: 'image/png', width: 4, height: 4 }));
+    expect(await a.saveCheatsheet()).toBe(true);
+    const { unzipSync } = await import('fflate');
+    const files = unzipSync(new Uint8Array(await save.mock.calls[0][1].arrayBuffer()));
+    expect(files[`assets/${id}.png`]).toEqual(bytes);
+    // Once there is room again, the next save stores it under the same id.
+    delete (full as { putAsset?: unknown }).putAsset;
+    await a.flushAssets();
+    expect(await full.getAssetBytes(id)).toEqual(bytes);
 });

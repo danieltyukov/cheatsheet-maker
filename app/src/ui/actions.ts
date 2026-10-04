@@ -5,6 +5,7 @@ import {
 import { createImageItem, createTextItem, DEFAULT_FILTERS } from '../model/factory';
 import { FormatError, packCheatsheet, type AssetBytes } from '../model/format';
 import { alignItems, distributeItems, packPage, type AlignMode, type PackMode } from '../model/layout';
+import { sha256Hex } from '../model/hash';
 import { pageDimensions, printableArea } from '../model/pageSizes';
 import type { AssetMeta, CheatDocument, Id, ImageItem, Item, Point, Rect } from '../model/types';
 import { classifyFile } from '../platform/classify';
@@ -32,6 +33,8 @@ export class Actions {
     pendingPdf: File | null = null;
     viewport = { w: 1000, h: 800 };
     private clipboard: Item[] = [];
+    /** Images storage refused (it is full, say), held here until a save gets them in. */
+    private unstored = new Map<Id, { bytes: Uint8Array; mime: string }>();
     private pasteCount = 0;
 
     constructor(readonly store: EditorStore, readonly assets: EditorAssets, readonly library: LibraryApi, readonly platform: Platform) {}
@@ -86,7 +89,7 @@ export class Actions {
         for (const [n, blob] of blobs.entries()) {
             try {
                 const img = await decodeImage(blob);
-                const id = await this.library.putAsset(img.bytes, img.mime);
+                const id = await this.storeAsset(img.bytes, img.mime);
                 this.assets.images.prime(id, img.bitmap);
                 const meta = { id, mime: img.mime, width: img.width, height: img.height };
                 metas.push(meta);
@@ -111,7 +114,7 @@ export class Actions {
 
     /** Regions are in PDF points on a page rasterised at `dpi`; the raster is stored once. */
     async addImageRegions(pagePng: Uint8Array, pixelSize: { width: number; height: number }, regions: Rect[], dpi: number): Promise<void> {
-        const id = await this.library.putAsset(pagePng, 'image/png');
+        const id = await this.storeAsset(pagePng, 'image/png');
         const meta = { id, mime: 'image/png', ...pixelSize };
         const area = printableArea(this.doc.setup);
         const { point } = this.centre();
@@ -343,18 +346,50 @@ export class Actions {
         }
     }
 
-    async saveCheatsheet() {
+    /** Resolves true once the file is written (false when cancelled or failed). */
+    async saveCheatsheet(): Promise<boolean> {
         try {
             const assets: AssetBytes = new Map();
             for (const p of this.doc.pages) for (const i of p.items) {
                 if (i.kind !== 'image' || assets.has(i.assetId)) continue;
-                const bytes = await this.library.getAssetBytes(i.assetId);
+                const bytes = this.unstored.get(i.assetId)?.bytes ?? (await this.library.getAssetBytes(i.assetId));
                 if (bytes) assets.set(i.assetId, { bytes, mime: this.doc.assets[i.assetId]?.mime ?? 'image/png' });
             }
             const zip = packCheatsheet(this.doc, assets);
-            await this.platform.saveFile(`${safeFileName(this.doc.title)}.cheatsheet`, bytesBlob(zip, 'application/zip'), 'cheatsheet');
+            return (await this.platform.saveFile(`${safeFileName(this.doc.title)}.cheatsheet`, bytesBlob(zip, 'application/zip'), 'cheatsheet')) === 'saved';
         } catch (e) {
             this.error(e);
+            return false;
+        }
+    }
+
+    // Assets
+
+    /**
+     * Stores an image and returns its id. When storage refuses it, the bytes stay in memory under
+     * the same content id, so the page still shows it, a saved file still has it, and the next
+     * autosave tries again (failing, and saying so, until there is room).
+     */
+    async storeAsset(bytes: Uint8Array, mime: string): Promise<Id> {
+        try {
+            return await this.library.putAsset(bytes, mime);
+        } catch {
+            const id = await sha256Hex(bytes);
+            this.unstored.set(id, { bytes, mime });
+            return id;
+        }
+    }
+
+    async getAsset(id: Id): Promise<Blob | null> {
+        const held = this.unstored.get(id);
+        return held ? bytesBlob(held.bytes, held.mime) : this.library.getAsset(id);
+    }
+
+    /** Autosave calls this before storing the document; it throws while storage still refuses. */
+    async flushAssets(): Promise<void> {
+        for (const [id, a] of this.unstored) {
+            await this.library.putAsset(a.bytes, a.mime);
+            this.unstored.delete(id);
         }
     }
 

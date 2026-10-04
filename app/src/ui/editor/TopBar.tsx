@@ -55,6 +55,8 @@ export function TopBar({ actions, onOpenLibrary, phone, coarse, isMac, onToggleP
     const history = useEditor((s) => s.history);
     const selectionCount = useEditor((s) => s.selection.length);
     const showGuides = useEditor((s) => s.showGuides);
+    // Phones have no room for "Saved", but a failing save must show there too.
+    const failing = useEditor((s) => s.saveStatus.state === 'error');
     const ctx: MenuContext = { actions, mod: isMac ? 'Cmd' : 'Ctrl', coarse, selectionCount, showGuides };
     return (
         <header className="top-bar">
@@ -85,7 +87,7 @@ export function TopBar({ actions, onOpenLibrary, phone, coarse, isMac, onToggleP
                 )}
             </div>
             <div className="top-right">
-                {!phone && <StatusIndicator actions={actions} />}
+                {(!phone || failing) && <StatusIndicator actions={actions} />}
                 <ThemeToggle />
                 {!phone && <IconButton label="Keyboard shortcuts" icon="keyboard" shortcut="?" onClick={() => store.openDialog('shortcuts')} />}
             </div>

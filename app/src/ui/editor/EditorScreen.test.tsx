@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, expect, test, vi } from 'vitest';
 import { EditorScreen } from './EditorScreen';
@@ -50,4 +50,45 @@ test('the shortcut sheet opens with ?', async () => {
     mount();
     await userEvent.keyboard('?');
     expect(screen.getByRole('dialog', { name: /Keyboard shortcuts/ })).toBeInTheDocument();
+});
+
+test('leaving with unsaved changes asks first', async () => {
+    const { store, onOpenLibrary } = mount();
+    store.setSaveStatus({ state: 'error', message: 'Storage is full.' });
+    await userEvent.click(screen.getByRole('button', { name: 'All cheatsheets' }));
+    expect(onOpenLibrary).not.toHaveBeenCalled();
+    const dialog = screen.getByRole('dialog', { name: /not saved/i });
+    expect(dialog).toHaveTextContent('Storage is full.');
+    await userEvent.click(screen.getByRole('button', { name: 'Leave anyway' }));
+    expect(onOpenLibrary).toHaveBeenCalled();
+});
+
+test('in a private window the library lives in memory too, so going to it needs no question', async () => {
+    const { store, onOpenLibrary } = mount();
+    store.setSaveStatus({ state: 'error', message: 'Browser storage is unavailable.', keptInMemory: true });
+    await userEvent.click(screen.getByRole('button', { name: 'All cheatsheets' }));
+    expect(onOpenLibrary).toHaveBeenCalled();
+});
+
+test('closing the tab with unsaved changes asks the browser to confirm', () => {
+    const { store } = mount();
+    const calm = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(calm);
+    expect(calm.defaultPrevented).toBe(false);
+    act(() => store.setSaveStatus({ state: 'error', message: 'Storage is full.' }));
+    const worried = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(worried);
+    expect(worried.defaultPrevented).toBe(true);
+});
+
+test('a phone shows when the work is not saved', () => {
+    const matches = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })) as never;
+    try {
+        const { store } = mount();
+        act(() => store.setSaveStatus({ state: 'error', message: 'Storage is full.' }));
+        expect(screen.getByRole('button', { name: /Not saved/ })).toBeInTheDocument();
+    } finally {
+        window.matchMedia = matches;
+    }
 });
