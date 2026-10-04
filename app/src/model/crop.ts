@@ -14,17 +14,19 @@ export function fullImageRect(item: ImageItem, image: { width: number; height: n
 export function cropDrag(start: ImageItem, handle: ResizeHandle | 'pan', d: Point, image: { width: number; height: number }): ImageItem {
     const sx = start.w / start.crop.w, sy = start.h / start.crop.h;
     const c = start.crop;
+    // Crops stay on whole source pixels: pixel work such as auto-trim and export reads them as indices.
+    const R = Math.round;
     if (handle === 'pan') {
         return {
             ...start,
-            crop: { ...c, x: clamp(c.x - d.x / sx, 0, image.width - c.w), y: clamp(c.y - d.y / sy, 0, image.height - c.h) },
+            crop: { ...c, x: R(clamp(c.x - d.x / sx, 0, image.width - c.w)), y: R(clamp(c.y - d.y / sy, 0, image.height - c.h)) },
         };
     }
     let x0 = c.x, y0 = c.y, x1 = c.x + c.w, y1 = c.y + c.h;
-    if (handle.includes('w')) x0 = clamp(c.x + d.x / sx, 0, x1 - MIN_CROP_PX);
-    if (handle.includes('e')) x1 = clamp(x1 + d.x / sx, x0 + MIN_CROP_PX, image.width);
-    if (handle.includes('n')) y0 = clamp(c.y + d.y / sy, 0, y1 - MIN_CROP_PX);
-    if (handle.includes('s')) y1 = clamp(y1 + d.y / sy, y0 + MIN_CROP_PX, image.height);
+    if (handle.includes('w')) x0 = R(clamp(c.x + d.x / sx, 0, x1 - MIN_CROP_PX));
+    if (handle.includes('e')) x1 = R(clamp(x1 + d.x / sx, x0 + MIN_CROP_PX, image.width));
+    if (handle.includes('n')) y0 = R(clamp(c.y + d.y / sy, 0, y1 - MIN_CROP_PX));
+    if (handle.includes('s')) y1 = R(clamp(y1 + d.y / sy, y0 + MIN_CROP_PX, image.height));
     // New box edges in the start item's local frame, at the same scale.
     const l = (x0 - c.x) * sx, t = (y0 - c.y) * sy;
     const r = start.w + (x1 - (c.x + c.w)) * sx, b = start.h + (y1 - (c.y + c.h)) * sy;

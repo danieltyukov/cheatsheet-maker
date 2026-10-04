@@ -5,7 +5,7 @@ import { EditorStore } from './store';
 import { EditorAssets } from './editorAssets';
 import { MemoryLibrary } from '../storage/library';
 import { addItems } from '../model/commands';
-import { createDocument, createShapeItem } from '../model/factory';
+import { createDocument, createImageItem, createShapeItem } from '../model/factory';
 import type { Platform } from '../platform';
 
 const platform: Platform = {
@@ -88,4 +88,17 @@ test('pasted text stays inside the printable area', () => {
     expect(t.kind).toBe('text');
     expect(t.x).toBeGreaterThanOrEqual(18);
     expect(t.x + t.w).toBeLessThanOrEqual(595.2756 - 18 + 1e-6);
+});
+
+test('auto-trim works on an image whose crop is not on whole pixels', () => {
+    const W = 200, H = 100;
+    const data = new Uint8ClampedArray(W * H * 4).fill(255);
+    for (let y = 30; y < 70; y++) for (let x = 60; x < 140; x++) data.set([0, 0, 0, 255], (y * W + x) * 4);
+    actions.assets.images.rgba = () => ({ data, width: W, height: H });
+    const img = { ...createImageItem({ id: 'a', mime: 'image/png', width: W, height: H }, { x: 300, y: 300 }, 1e6, 1e6), crop: { x: 18.67, y: 0.4, w: 181.33, h: 99.6 } };
+    store.apply((d) => addItems(d, 0, [img]));
+    store.select([img.id]);
+    expect(() => actions.trimSelected()).not.toThrow();
+    const out = store.doc.pages[0].items.find((i) => i.id === img.id)!;
+    expect(out.kind === 'image' && out.crop).toEqual({ x: 58, y: 28, w: 84, h: 44 });
 });

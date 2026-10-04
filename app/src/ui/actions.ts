@@ -236,14 +236,25 @@ export class Actions {
             if (item.kind !== 'image' || item.locked) continue;
             const src = this.assets.images.rgba(item.assetId);
             if (!src) continue;
-            // Trim inside the current crop only.
-            const { x, y, w, h } = item.crop;
+            // Trim inside the current crop only, on whole pixels inside the image.
+            const x = Math.max(0, Math.floor(item.crop.x)), y = Math.max(0, Math.floor(item.crop.y));
+            const w = Math.min(src.width, Math.ceil(item.crop.x + item.crop.w)) - x;
+            const h = Math.min(src.height, Math.ceil(item.crop.y + item.crop.h)) - y;
+            if (w <= 0 || h <= 0) continue;
             const data = new Uint8ClampedArray(w * h * 4);
             for (let row = 0; row < h; row++) data.set(src.data.subarray(((y + row) * src.width + x) * 4, ((y + row) * src.width + x + w) * 4), row * w * 4);
             const r = findTrimRect({ data, width: w, height: h });
             if (!r || (r.w === w && r.h === h)) continue;
-            const sx = item.w / w, sy = item.h / h;
-            patches[item.id] = { crop: { x: x + r.x, y: y + r.y, w: r.w, h: r.h }, w: r.w * sx, h: r.h * sy, x: item.x + r.x * sx, y: item.y + r.y * sy };
+            // Keep the image's scale: map the trimmed pixels back through the original crop.
+            const sx = item.w / item.crop.w, sy = item.h / item.crop.h;
+            const nx = x + r.x, ny = y + r.y;
+            patches[item.id] = {
+                crop: { x: nx, y: ny, w: r.w, h: r.h },
+                w: r.w * sx,
+                h: r.h * sy,
+                x: item.x + (nx - item.crop.x) * sx,
+                y: item.y + (ny - item.crop.y) * sy,
+            };
         }
         if (Object.keys(patches).length) this.store.apply((d) => updateItems(d, patches));
         else this.store.toast('Nothing to trim: the image has no plain border.');

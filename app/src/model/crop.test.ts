@@ -39,3 +39,11 @@ test('the opposite edge stays put on a rotated image', () => {
 test('fullImageRect places the whole source around the crop', () => {
     expect(fullImageRect(start, img)).toEqual({ x: -200, y: -100, w: 800, h: 400 });
 });
+
+test('crops stay on whole source pixels, so pixel operations on them line up', () => {
+    const out = cropDrag(start, 'w', { x: 7, y: 3 }, img);
+    for (const v of Object.values(out.crop)) expect(Number.isInteger(v)).toBe(true);
+    const panned = cropDrag(start, 'pan', { x: -7.3, y: 1.1 }, img);
+    for (const v of Object.values(panned.crop)) expect(Number.isInteger(v)).toBe(true);
+    expect(out.w / out.crop.w).toBeCloseTo(start.w / start.crop.w, 9);
+});
