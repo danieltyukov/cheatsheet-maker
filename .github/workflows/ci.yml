@@ -59,9 +59,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+      # rustup ships on every GitHub runner; no third-party action between the source and the binaries.
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
       - name: Tauri build dependencies
         run: |
           sudo apt-get update
