@@ -14,6 +14,14 @@ const dynamicFonts = import.meta.glob('../../../node_modules/@mathjax/mathjax-ne
 const fontLoaders = new Map(Object.entries(dynamicFonts).map(([path, load]) => [path.split('/').pop()!, load]));
 
 type Engine = { convert(tex: string, display: boolean): Promise<string> };
+
+/**
+ * MathJax's serialiser copies the TeX source into data-latex attributes without escaping < or &,
+ * which is fine for HTML but makes the SVG invalid XML, so an <img> of it never decodes.
+ */
+function escapeAttributes(svg: string): string {
+    return svg.replace(/="([^"]*)"/g, (_, v: string) => `="${v.replace(/&(?!(?:lt|gt|amp|quot|#\d+);)/g, '&amp;').replace(/</g, '&lt;')}"`);
+}
 let engine: Promise<Engine> | null = null;
 
 async function createEngine(): Promise<Engine> {
@@ -45,7 +53,7 @@ async function createEngine(): Promise<Engine> {
     return {
         async convert(tex, display) {
             const node = await doc.convertPromise(tex, { display });
-            return adaptor.innerHTML(node);
+            return escapeAttributes(adaptor.innerHTML(node));
         },
     };
 }
