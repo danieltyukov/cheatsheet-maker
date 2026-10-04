@@ -218,13 +218,14 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      # The platform matches compileSdk in gen/android/app/build.gradle.kts; scripts/check-version.sh checks it.
       - name: Install the platform, build tools and NDK
         run: |
           set -euo pipefail
           sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           # `yes` is killed by SIGPIPE once sdkmanager stops reading.
           yes | "$sdkmanager" --licenses > /dev/null || true
-          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+          "$sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" "ndk;$NDK_VERSION"
           echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
       # rustup ships on every GitHub runner; no third-party action between the source and the binaries.
       - name: Rust toolchain
