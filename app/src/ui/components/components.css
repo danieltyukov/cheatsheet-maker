@@ -115,7 +115,10 @@
 .menu-icon { display: grid; place-items: center; color: var(--ink-2); }
 .menu-shortcut { font: 12px var(--font-ui); color: var(--ink-3); }
 .menu-sep { height: 1px; margin: 5px 4px; background: var(--line); }
-@media (pointer: coarse) { .menu-item { min-height: 44px; } }
+@media (pointer: coarse) {
+    .menu-item { min-height: 44px; }
+    .menu-shortcut { display: none; }
+}
 
 /* Dialogs */
 .dialog {
