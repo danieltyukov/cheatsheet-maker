@@ -4,6 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
+// \mathbb, \mathcal, \mathfrak, \mathscr, \mathtt, and symbols such as \Re, \wp, \checkmark and \triangleq.
+const PRECACHED_MATH_FONTS = new Set(['double-struck', 'calligraphic', 'fraktur', 'script', 'monospace', 'math', 'shapes']);
+
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string };
 
 export default defineConfig(({ mode }) => ({
@@ -18,12 +21,13 @@ export default defineConfig(({ mode }) => ({
         chunkSizeWarningLimit: 2500,
         rollupOptions: {
             output: {
-                // MathJax's extra alphabets (Greek, Cyrillic, Braille...) get their own folder so the
-                // service worker can cache them on first use instead of on install.
-                chunkFileNames: (chunk) =>
-                    chunk.facadeModuleId?.includes('mathjax-newcm-font/mjs/svg/dynamic/')
-                        ? 'assets/mathfont/[name]-[hash].js'
-                        : 'assets/[name]-[hash].js',
+                // MathJax loads some symbols from extra font files. Those common in formulas stay in
+                // assets/ and are precached, so they work offline from the first visit; the rest
+                // (Cyrillic, Braille, accented text...) go to mathfont/ and are cached on first use.
+                chunkFileNames: (chunk) => {
+                    const font = /mathjax-newcm-font\/mjs\/svg\/dynamic\/([\w-]+)\.js$/.exec(chunk.facadeModuleId ?? '')?.[1];
+                    return font && !PRECACHED_MATH_FONTS.has(font) ? 'assets/mathfont/[name]-[hash].js' : 'assets/[name]-[hash].js';
+                },
             },
         },
     },
