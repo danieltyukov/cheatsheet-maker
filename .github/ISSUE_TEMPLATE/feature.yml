@@ -1,0 +1,20 @@
+name: Feature idea
+description: Something that would make sheets faster to make or better on paper.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: How you imagine it working.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do now instead

@@ -1,0 +1,90 @@
+name: CI
+
+# Standard GitHub-hosted runners only, free on a public repository, and no
+# secrets, so pull requests from forks run the same checks.
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: App and site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Types
+        run: npm run typecheck
+      - name: Unit and component tests
+        run: npm test
+      - name: Versions agree
+        run: sh scripts/check-version.sh
+      - name: Shell scripts
+        run: shellcheck scripts/*.sh
+      - name: Browsers for Playwright
+        run: npx playwright install --with-deps chromium
+      - name: End-to-end tests of the web app
+        run: npm run e2e -w app
+      - name: Website build and tests
+        run: npm run e2e -w site
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            app/playwright-report/
+            app/test-results/
+            site/test-results/
+          retention-days: 7
+
+  tauri:
+    name: Desktop shell
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Cache the Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-ci-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-ci-
+      - run: npm ci
+      # tauri::generate_context! embeds the built front end, so it has to exist.
+      - name: Front end for Tauri
+        run: npm run build:tauri -w app
+      - name: Format
+        run: cargo fmt --all --check
+      - name: Clippy
+        run: cargo clippy -p cheatsheet-maker --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test -p cheatsheet-maker

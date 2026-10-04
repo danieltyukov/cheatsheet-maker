@@ -10,3 +10,4 @@ site/playwright-report/
 .superpowers/
 *.log
 .DS_Store
+.playwright-mcp/

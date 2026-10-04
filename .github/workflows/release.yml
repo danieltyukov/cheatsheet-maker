@@ -1,0 +1,320 @@
+name: Release
+
+# A v* tag builds every platform and publishes a GitHub release.
+# Running it by hand (workflow_dispatch) is a dry run: everything is built and
+# kept as workflow artifacts for a day, and nothing is published.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUNDLE_DIR: target/release/bundle
+
+jobs:
+  check:
+    name: Versions agree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Versions agree, and the tag has release notes
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            sh scripts/check-version.sh "$GITHUB_REF_NAME"
+            sh scripts/release-notes.sh "$GITHUB_REF_NAME" > /dev/null
+          else
+            sh scripts/check-version.sh
+          fi
+
+  linux-app:
+    name: Linux AppImage and deb
+    needs: check
+    # 22.04 rather than the newest image so the binaries run on older glibc too.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Tauri build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - name: Cache the Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-release-linux-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-release-linux-
+      - run: npm ci
+      - name: Build the bundles
+        working-directory: app
+        run: |
+          set -eu
+          rm -rf "../$BUNDLE_DIR"
+          npx tauri build --bundles deb,appimage
+      - name: Collect them under stable names
+        run: |
+          set -eu
+          mkdir -p out
+          take() {
+            dest="$1"; shift
+            if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+              echo "expected exactly one bundle for $dest, found $#: $*" >&2
+              exit 1
+            fi
+            cp "$1" "out/$dest"
+            echo "$1 -> $dest"
+          }
+          take cheatsheet-maker_amd64.deb "$BUNDLE_DIR"/deb/*.deb
+          take cheatsheet-maker_x86_64.AppImage "$BUNDLE_DIR"/appimage/*.AppImage
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-app
+          path: out/
+          retention-days: 1
+          if-no-files-found: error
+
+  windows-app:
+    name: Windows installers
+    needs: check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache the Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-release-windows-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-release-windows-
+      - run: npm ci
+      - name: Build the installers
+        working-directory: app
+        shell: bash
+        run: |
+          set -eu
+          rm -rf "../$BUNDLE_DIR"
+          npx tauri build --bundles nsis,msi
+      - name: Collect them under stable names
+        shell: bash
+        run: |
+          set -eu
+          shopt -s nullglob
+          mkdir -p out
+          take() {
+            dest="$1"; shift
+            if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+              echo "expected exactly one bundle for $dest, found $#: $*" >&2
+              exit 1
+            fi
+            cp "$1" "out/$dest"
+            echo "$1 -> $dest"
+          }
+          take CheatsheetMaker_x64-setup.exe "$BUNDLE_DIR"/nsis/*.exe
+          take CheatsheetMaker_x64.msi "$BUNDLE_DIR"/msi/*.msi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-app
+          path: out/
+          retention-days: 1
+          if-no-files-found: error
+
+  macos-app:
+    name: macOS disk image
+    needs: check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+      - name: Cache the Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-release-macos-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-release-macos-
+      - run: npm ci
+      # Ad-hoc signed by the bundler, not notarised: there is no Apple account
+      # behind this project. The README says how to open it the first time.
+      - name: Build the universal disk image
+        working-directory: app
+        run: npx tauri build --target universal-apple-darwin --bundles dmg
+      - name: Collect it under a stable name
+        run: |
+          set -eu
+          mkdir -p out
+          set -- target/universal-apple-darwin/release/bundle/dmg/*.dmg
+          if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+            echo "expected exactly one disk image, found $#: $*" >&2
+            exit 1
+          fi
+          cp "$1" out/CheatsheetMaker_universal.dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos-app
+          path: out/
+          retention-days: 1
+          if-no-files-found: error
+
+  android:
+    name: Android APK
+    needs: check
+    runs-on: ubuntu-latest
+    env:
+      # Pinned so a new NDK on the runner image cannot change what a tag builds.
+      NDK_VERSION: 28.2.13676358
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install the platform, build tools and NDK
+        run: |
+          set -euo pipefail
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # `yes` is killed by SIGPIPE once sdkmanager stops reading.
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;$NDK_VERSION"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/$NDK_VERSION" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - name: Cache the Rust build
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: cargo-release-android-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-release-android-
+      - run: npm ci
+      # The keystore never lives in the repository. Without the secrets (a
+      # fork, say) the APK is built unsigned and the run says so.
+      - name: Write the signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_BASE64:-}" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 is not set, so this APK will be unsigned."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          {
+            printf 'storeFile=%s\n' "$RUNNER_TEMP/release.jks"
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > app/src-tauri/gen/android/keystore.properties
+      - name: Build the release APK
+        working-directory: app
+        run: npx tauri android build --apk --target aarch64 --target x86_64
+      - name: Remove the signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks" app/src-tauri/gen/android/keystore.properties
+      - name: Collect the APK under a stable name
+        run: |
+          set -euo pipefail
+          outputs=app/src-tauri/gen/android/app/build/outputs/apk/universal/release
+          mkdir -p out
+          if [ -f "$outputs/app-universal-release.apk" ]; then
+            cp "$outputs/app-universal-release.apk" out/cheatsheet-maker.apk
+          elif [ -f "$outputs/app-universal-release-unsigned.apk" ]; then
+            echo "::warning::Unsigned APK. Android will not install it until it is signed."
+            cp "$outputs/app-universal-release-unsigned.apk" out/cheatsheet-maker.apk
+          else
+            echo "no APK in $outputs" >&2
+            ls -la "$outputs" >&2 || true
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v7
+        with:
+          name: android
+          path: out/
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish
+    needs: [linux-app, windows-app, macos-app, android]
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          path: assets
+          merge-multiple: true
+      - name: Checksums
+        working-directory: assets
+        run: sha256sum -- * > SHA256SUMS
+      # gh rather than a third-party release action: it is preinstalled and uses
+      # this job's own token.
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          {
+            sh scripts/release-notes.sh "$TAG"
+            cat <<'BODY'
+
+          ## Downloads
+
+          - `CheatsheetMaker_x64-setup.exe`, Windows. Installs for the current user. Not code-signed, so SmartScreen asks once: More info, then Run anyway. `CheatsheetMaker_x64.msi` is the same build as an MSI.
+          - `CheatsheetMaker_universal.dmg`, macOS on Apple silicon and Intel. Not notarised: right-click the app and choose Open the first time.
+          - `cheatsheet-maker_x86_64.AppImage`, Linux. `chmod +x` and run it.
+          - `cheatsheet-maker_amd64.deb`, Debian and Ubuntu: `sudo apt install ./cheatsheet-maker_amd64.deb`
+          - `cheatsheet-maker.apk`, Android 7 and newer.
+          - The web app needs no download: https://danieltyukov.github.io/cheatsheet-maker/app/
+
+          `SHA256SUMS` lists a checksum for every file.
+          BODY
+          } > notes.md
+          gh release create "$TAG" --title "Cheatsheet Maker ${TAG#v}" --notes-file notes.md --verify-tag assets/*
