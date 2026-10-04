@@ -19,10 +19,14 @@ export function createCanvas(w: number, h: number): AnyCanvas {
     return c;
 }
 
-function dataUrlBytes(url: string): Uint8Array {
+export function dataUrlBytes(url: string): Uint8Array {
     const comma = url.indexOf(',');
     if (comma < 0 || url === 'data:,') throw new Error('The browser could not encode the image.');
-    return Uint8Array.from(atob(url.slice(comma + 1)), (c) => c.charCodeAt(0));
+    // A plain loop: Uint8Array.from with a map function is about ten times slower on big images.
+    const bin = atob(url.slice(comma + 1));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
 }
 
 export async function canvasToBytes(canvas: AnyCanvas, type = 'image/png', quality?: number): Promise<Uint8Array> {
