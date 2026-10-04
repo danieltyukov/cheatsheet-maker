@@ -1,0 +1,52 @@
+.dialog.pdf-dialog { width: min(1080px, calc(100vw - 32px)); }
+.pdf-layout { display: grid; grid-template-columns: 132px 1fr; gap: var(--space-4); min-height: 0; }
+.pdf-thumbs {
+    display: grid;
+    align-content: start;
+    gap: var(--space-2);
+    max-height: 64dvh;
+    margin: 0;
+    padding: 0 4px 0 0;
+    overflow-y: auto;
+    list-style: none;
+}
+.pdf-thumb {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    font-size: 12px;
+    color: var(--ink-2);
+}
+.pdf-thumb canvas { width: 100%; height: auto; background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.2); }
+.pdf-thumb.is-on { border-color: var(--ink); color: var(--ink); font-weight: 700; }
+.pdf-main { min-width: 0; }
+.pdf-hint { margin: 0 0 var(--space-2); font-size: 14px; color: var(--ink-2); }
+.pdf-page { max-height: 64dvh; overflow: auto; }
+.pdf-stage { position: relative; display: inline-block; cursor: crosshair; touch-action: none; user-select: none; }
+.pdf-stage canvas { display: block; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); }
+.pdf-rect {
+    position: absolute;
+    border: 2px solid var(--focus);
+    background: rgb(47 111 219 / 0.12);
+}
+.pdf-rect .icon-btn {
+    position: absolute;
+    top: -14px;
+    right: -14px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+.pdf-note { margin: var(--space-3) 0; }
+.pdf-error { color: var(--danger); }
+.pdf-spacer { flex: 1; }
+@media (max-width: 719px) {
+    .pdf-layout { grid-template-columns: 1fr; }
+    .pdf-thumbs { grid-auto-flow: column; grid-auto-columns: 84px; max-height: none; overflow-x: auto; overflow-y: hidden; }
+}

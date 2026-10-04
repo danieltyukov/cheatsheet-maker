@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Privacy, Cheatsheet Maker</title>
+    <meta name="description" content="What Cheatsheet Maker stores, where, and what it never sends anywhere." />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        var t = localStorage.getItem('cm-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <header class="site-head">
+      <div class="wrap head-row">
+        <a class="brand" href="./" aria-label="Cheatsheet Maker home">
+          <img src="./favicon.svg" alt="" width="32" height="32" />
+          <span>Cheatsheet Maker</span>
+        </a>
+        <nav aria-label="Site">
+          <a href="./">Home</a>
+          <a href="https://github.com/danieltyukov/cheatsheet-maker">GitHub</a>
+          <button type="button" class="theme" data-theme-toggle aria-pressed="false" aria-label="Switch to the dark theme">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="sun" d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+          </button>
+        </nav>
+      </div>
+    </header>
+    <main id="main" class="wrap prose">
+      <h1>Privacy</h1>
+      <p>Cheatsheet Maker has no server and no account. Nothing you make is sent anywhere by the app.</p>
+
+      <h2>What is stored, and where</h2>
+      <ul>
+        <li><strong>Your cheatsheets and their images</strong> are stored on your device: in your browser's IndexedDB for the web app, and in the app's own storage for the desktop and Android apps.</li>
+        <li><strong>Preferences</strong> (tool colours, export resolution, theme) are stored in the same place.</li>
+        <li><strong>Files you export</strong> are written where you choose in the save dialog, or to your downloads folder.</li>
+      </ul>
+
+      <h2>What the apps can reach</h2>
+      <ul>
+        <li>Files you pick in an open dialog, and the place you pick in a save dialog. Nothing else on disk.</li>
+        <li>On Linux, the desktop app reads one more file, <code>~/.config/cheatsheet-maker/autosave.json</code>, if it exists, to offer importing work from the old version. It is only read, never changed.</li>
+        <li>The camera, only when you choose Insert, Camera on a phone, through your system's camera screen.</li>
+      </ul>
+
+      <h2>What is never collected</h2>
+      <p>No analytics, no crash reporting, no tracking, no cookies and no third-party requests. Fonts and formula rendering are bundled with the app. The website is a static page with no scripts besides the theme switch and the download button.</p>
+
+      <h2>Removing your data</h2>
+      <p>Delete cheatsheets from the library screen. Clearing the site's data in your browser settings, or uninstalling the app, removes everything.</p>
+
+      <p><a href="./">Back to the home page</a></p>
+    </main>
+    <footer class="site-foot">
+      <div class="wrap foot-row">
+        <p><a href="https://github.com/danieltyukov/cheatsheet-maker">Source on GitHub</a>, MIT licence.</p>
+      </div>
+    </footer>
+  </body>
+</html>

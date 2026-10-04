@@ -1,0 +1,13 @@
+node_modules/
+dist/
+target/
+app/src-tauri/gen/schemas/
+app/test-results/
+app/playwright-report/
+site/test-results/
+site/playwright-report/
+.claude/
+.superpowers/
+*.log
+.DS_Store
+.playwright-mcp/

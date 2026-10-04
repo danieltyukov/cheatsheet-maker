@@ -1,0 +1,77 @@
+/*
+ * Ink on graph paper, with highlighter yellow reserved for what is active:
+ * the current tool, the current page, the primary action.
+ */
+:root {
+    --font-ui: 'Atkinson Hyperlegible Next Variable', system-ui, sans-serif;
+    --font-display: 'Bricolage Grotesque Variable', 'Atkinson Hyperlegible Next Variable', sans-serif;
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+    --ink: #15181e;
+    --ink-2: #4b515c;
+    --ink-3: #7d8491;
+    --paper: #eef0f3;
+    --surface: #ffffff;
+    --surface-2: #f4f5f7;
+    --line: #dde1e6;
+    --canvas-bg: #e4e8ed;
+    --canvas-dot: #c9d0d9;
+    --accent: #ffd43b;
+    --accent-strong: #f2b705;
+    --accent-ink: #15181e;
+    --focus: #2f6fdb;
+    --danger: #c2412d;
+    --ok: #2e7d4f;
+    --shadow: 0 1px 2px rgb(21 24 30 / 0.06), 0 8px 24px rgb(21 24 30 / 0.08);
+    --page-shadow: rgb(21 24 30 / 0.18);
+
+    --radius: 8px;
+    --radius-sm: 6px;
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 24px;
+    --bar-h: 52px;
+    color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+        --ink: #e8eaee;
+        --ink-2: #b3b9c4;
+        --ink-3: #858c99;
+        --paper: #10141c;
+        --surface: #161b25;
+        --surface-2: #1d2330;
+        --line: #2a3140;
+        --canvas-bg: #0b0f16;
+        --canvas-dot: #1c2433;
+        --accent-strong: #ffe066;
+        --focus: #7aa7ff;
+        --danger: #ff8a73;
+        --ok: #7ad19b;
+        --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+        --page-shadow: rgb(0 0 0 / 0.6);
+        color-scheme: dark;
+    }
+}
+
+:root[data-theme='dark'] {
+    --ink: #e8eaee;
+    --ink-2: #b3b9c4;
+    --ink-3: #858c99;
+    --paper: #10141c;
+    --surface: #161b25;
+    --surface-2: #1d2330;
+    --line: #2a3140;
+    --canvas-bg: #0b0f16;
+    --canvas-dot: #1c2433;
+    --accent-strong: #ffe066;
+    --focus: #7aa7ff;
+    --danger: #ff8a73;
+    --ok: #7ad19b;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+    --page-shadow: rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+}

@@ -1,0 +1,58 @@
+name: Bug report
+description: Something does not work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If this is a security problem, do not open an issue; see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Shown at the bottom of the keyboard shortcuts sheet (press ?).
+      placeholder: 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it runs
+      options:
+        - Web app in Chrome or Edge
+        - Web app in Firefox
+        - Web app in Safari
+        - Installed web app (from the browser)
+        - Windows app
+        - macOS app
+        - Linux AppImage
+        - Linux deb
+        - Android app
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and any error message word for word.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      placeholder: |
+        1. Paste a screenshot
+        2. Double-click it to crop
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: markdown
+    attributes:
+      value: |
+        A `.cheatsheet` file that shows the problem helps a lot (Export, Save a .cheatsheet file).
+        It contains your images, so only attach one you are happy to make public.

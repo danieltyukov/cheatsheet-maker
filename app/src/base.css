@@ -1,0 +1,33 @@
+*, *::before, *::after { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.4 var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The highlighter swipe: a slightly skewed band with ragged ends, used for whatever is active. */
+.hl {
+    position: relative;
+    isolation: isolate;
+    color: var(--accent-ink);
+}
+.hl::before {
+    content: '';
+    position: absolute;
+    inset: 3px -2px;
+    z-index: -1;
+    background: var(--accent);
+    border-radius: 3px 9px 4px 11px / 9px 3px 10px 4px;
+    transform: skewX(-6deg) rotate(-1deg);
+}
