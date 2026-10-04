@@ -22,9 +22,14 @@ export function extForMime(mime: string): string {
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-function num(o: Obj, k: string, where: string): number {
+// Bounds are generous for real sheets and stop a damaged or crafted file from making the
+// renderer loop for minutes (a 1e-9 pt grid, a billion columns) every time the app opens.
+const COORD = 100_000;
+
+function num(o: Obj, k: string, where: string, min = -COORD, max = COORD): number {
     const v = o[k];
     if (typeof v !== 'number' || !Number.isFinite(v)) throw new FormatError(`${where}: "${k}" is not a number.`);
+    if (v < min || v > max) throw new FormatError(`${where}: "${k}" is out of range.`);
     return v;
 }
 function str(o: Obj, k: string, where: string): string {
@@ -52,17 +57,19 @@ function colour(o: Obj, k: string, where: string): string {
 }
 const nullableColour = (o: Obj, k: string, where: string) => (o[k] === null ? null : colour(o, k, where));
 
-function rect(v: unknown, where: string) {
-    if (!isObj(v)) throw new FormatError(`${where}: missing rectangle.`);
-    return { x: num(v, 'x', where), y: num(v, 'y', where), w: num(v, 'w', where), h: num(v, 'h', where) };
+function crop(v: unknown, where: string) {
+    if (!isObj(v)) throw new FormatError(`${where}: missing crop.`);
+    const c = { x: num(v, 'x', where, 0), y: num(v, 'y', where, 0), w: num(v, 'w', where, 0), h: num(v, 'h', where, 0) };
+    if (c.w <= 0 || c.h <= 0) throw new FormatError(`${where}: the crop is empty.`);
+    return c;
 }
 
 function item(v: unknown, where: string): Item {
     if (!isObj(v)) throw new FormatError(`${where} is not an object.`);
     const base = {
         id: str(v, 'id', where),
-        x: num(v, 'x', where), y: num(v, 'y', where), w: num(v, 'w', where), h: num(v, 'h', where),
-        rotation: num(v, 'rotation', where),
+        x: num(v, 'x', where), y: num(v, 'y', where), w: num(v, 'w', where, 0), h: num(v, 'h', where, 0),
+        rotation: num(v, 'rotation', where, -3600, 3600),
         ...(v.locked === true ? { locked: true } : {}),
     };
     switch (v.kind) {
@@ -70,24 +77,24 @@ function item(v: unknown, where: string): Item {
             const f = v.filters;
             if (!isObj(f)) throw new FormatError(`${where}: missing filters.`);
             return {
-                ...base, kind: 'image', assetId: str(v, 'assetId', where), crop: rect(v.crop, where),
+                ...base, kind: 'image', assetId: str(v, 'assetId', where), crop: crop(v.crop, where),
                 filters: {
-                    whiteToAlpha: num(f, 'whiteToAlpha', where), invert: bool(f, 'invert', where),
-                    grayscale: bool(f, 'grayscale', where), contrast: num(f, 'contrast', where),
+                    whiteToAlpha: num(f, 'whiteToAlpha', where, 0, 1), invert: bool(f, 'invert', where),
+                    grayscale: bool(f, 'grayscale', where), contrast: num(f, 'contrast', where, 0.05, 10),
                 },
             };
         }
         case 'text':
             return {
-                ...base, kind: 'text', text: str(v, 'text', where), fontSize: num(v, 'fontSize', where),
+                ...base, kind: 'text', text: str(v, 'text', where), fontSize: num(v, 'fontSize', where, 0.5, 400),
                 font: oneOf(v, 'font', ['sans', 'narrow', 'serif', 'mono'] as const, where), color: colour(v, 'color', where),
-                background: nullableColour(v, 'background', where), padding: num(v, 'padding', where),
+                background: nullableColour(v, 'background', where), padding: num(v, 'padding', where, 0, 400),
                 align: oneOf(v, 'align', ['left', 'center', 'right'] as const, where),
             };
         case 'shape':
             return {
                 ...base, kind: 'shape', shape: oneOf(v, 'shape', ['rect', 'ellipse', 'line', 'arrow'] as const, where),
-                stroke: colour(v, 'stroke', where), strokeWidth: num(v, 'strokeWidth', where),
+                stroke: colour(v, 'stroke', where), strokeWidth: num(v, 'strokeWidth', where, 0, 200),
                 fill: nullableColour(v, 'fill', where), flipX: bool(v, 'flipX', where), flipY: bool(v, 'flipY', where),
             };
         case 'stroke': {
@@ -97,7 +104,7 @@ function item(v: unknown, where: string): Item {
             }
             return {
                 ...base, kind: 'stroke', tool: oneOf(v, 'tool', ['pen', 'highlighter'] as const, where),
-                color: colour(v, 'color', where), size: num(v, 'size', where), points: pts as number[],
+                color: colour(v, 'color', where), size: num(v, 'size', where, 0.05, 1000), points: pts as number[],
             };
         }
         default:
@@ -118,9 +125,11 @@ export function validateDocument(json: unknown): CheatDocument {
     const setup: PageSetup = {
         size: oneOf(s, 'size', ['A4', 'Letter', 'A3', 'A5', 'Legal'] as const, 'Page setup'),
         orientation: oneOf(s, 'orientation', ['portrait', 'landscape'] as const, 'Page setup'),
-        margin: num(s, 'margin', 'Page setup'), columns: num(s, 'columns', 'Page setup'),
-        gutter: num(s, 'gutter', 'Page setup'), grid: num(s, 'grid', 'Page setup'),
+        margin: num(s, 'margin', 'Page setup', 0, 200), columns: num(s, 'columns', 'Page setup', 1, 6),
+        gutter: num(s, 'gutter', 'Page setup', 0, 200), grid: num(s, 'grid', 'Page setup', 0, 500),
     };
+    if (!Number.isInteger(setup.columns)) throw new FormatError('Page setup: "columns" must be a whole number.');
+    if (setup.grid > 0 && setup.grid < 2) throw new FormatError('Page setup: the grid is finer than 2 pt.');
     if (json.pages.length === 0) throw new FormatError('The document has no pages.');
     const pages: Page[] = json.pages.map((p, pi) => {
         if (!isObj(p) || !Array.isArray(p.items)) throw new FormatError(`Page ${pi + 1} is not valid.`);
@@ -134,7 +143,8 @@ export function validateDocument(json: unknown): CheatDocument {
     }
     return {
         version: 1, id: str(json, 'id', 'Document'), title: str(json, 'title', 'Document'),
-        createdAt: num(json, 'createdAt', 'Document'), updatedAt: num(json, 'updatedAt', 'Document'),
+        // Milliseconds since 1970, far outside the coordinate range.
+        createdAt: num(json, 'createdAt', 'Document', 0, Number.MAX_SAFE_INTEGER), updatedAt: num(json, 'updatedAt', 'Document', 0, Number.MAX_SAFE_INTEGER),
         setup, pages, assets,
     };
 }

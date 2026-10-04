@@ -64,3 +64,41 @@ describe('colours from files', () => {
         expect(() => validateDocument({ ...doc, pages: [{ ...doc.pages[0], items: [{ ...stroke, color: 'var(--x)' }] }] })).toThrow(FormatError);
     });
 });
+
+describe('value ranges', () => {
+    const doc = sample();
+    const withSetup = (patch: object) => ({ ...doc, setup: { ...doc.setup, ...patch } });
+    const withItem = (kind: string, patch: object) => ({
+        ...doc,
+        pages: [{ ...doc.pages[0], items: doc.pages[0].items.map((i) => (i.kind === kind ? { ...i, ...patch } : i)) }],
+    });
+    test.each([
+        ['a grid finer than 2 pt', withSetup({ grid: 1e-9 })],
+        ['a billion columns', withSetup({ columns: 1e9 })],
+        ['fractional columns', withSetup({ columns: 2.5 })],
+        ['a negative margin', withSetup({ margin: -50 })],
+        ['a margin wider than any page allows', withSetup({ margin: 1000 })],
+        ['a negative gutter', withSetup({ gutter: -1 })],
+        ['a negative width', withItem('shape', { w: -5 })],
+        ['an empty crop', withItem('image', { crop: { x: 0, y: 0, w: 0, h: 4 } })],
+        ['a zero font size', withItem('text', { fontSize: 0 })],
+        ['a huge font size', withItem('text', { fontSize: 5000 })],
+        ['a negative stroke width', withItem('shape', { strokeWidth: -1 })],
+        ['a zero pen size', withItem('stroke', { size: 0 })],
+        ['coordinates far off the page', withItem('shape', { x: 1e12 })],
+    ])('rejects %s', (_name, bad) => {
+        expect(() => validateDocument(bad)).toThrow(FormatError);
+    });
+    test('accepts the defaults and a 5 mm grid', () => {
+        expect(validateDocument(withSetup({ grid: 14.17, columns: 3 })).setup.columns).toBe(3);
+    });
+});
+
+test('a document made now (real millisecond timestamps) survives a save and reopen', () => {
+    const now = Date.UTC(2026, 9, 4, 12);
+    const doc = { ...createDocument('Today', now), updatedAt: now + 60_000 };
+    const back = unpackCheatsheet(packCheatsheet(doc, new Map())).doc;
+    expect(back.createdAt).toBe(now);
+    expect(back.updatedAt).toBe(now + 60_000);
+    expect(() => validateDocument({ ...doc, createdAt: -1 })).toThrow(FormatError);
+});
