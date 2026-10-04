@@ -71,3 +71,25 @@ A release is a tag. Bump the version in `Cargo.toml`, `app/package.json`,
 (`sh scripts/check-version.sh` checks they agree), move the "Unreleased" notes
 into a new section of `CHANGELOG.md`, and push a `v1.2.3` tag. The release
 workflow builds every platform and publishes them with checksums.
+
+Running the release workflow by hand from the Actions tab is a dry run: it
+builds every platform, keeps the files as workflow artifacts for a day, and
+publishes nothing.
+
+The Android APK is signed with a key that never lives in this repository. The
+release workflow reads it from four repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | The keystore, base64 encoded: `base64 -w0 release.jks` |
+| `ANDROID_KEYSTORE_PASSWORD` | Store password |
+| `ANDROID_KEY_ALIAS` | Key alias |
+| `ANDROID_KEY_PASSWORD` | Key password (the store password, for a PKCS12 keystore) |
+
+Without them the release still runs and attaches an unsigned APK, which Android
+will not install. Back up the keystore and its passwords: an app signed with a
+lost key cannot be updated in place, only uninstalled and installed again.
+
+`master` is protected: changes arrive through pull requests once the "App and
+site" and "Desktop shell" checks pass, and it cannot be force-pushed or
+deleted.
