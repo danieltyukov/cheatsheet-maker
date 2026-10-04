@@ -75,12 +75,17 @@ asynchronous encoders can wait several seconds for idle time.
 images keyed by the SHA-256 of their bytes, and small settings. Content
 addressing means a lecture page used by five crops, or an image in two
 documents, is stored once. Images are removed when no stored document refers
-to them. If IndexedDB is unavailable (some private windows), a `MemoryLibrary`
-with the same interface keeps the editor working, and the status says the work
-is not being saved.
+to them. If IndexedDB is unavailable (some private windows), or fails right
+after opening, a `MemoryLibrary` with the same interface keeps the editor
+working, and the status says the work is not being saved.
 
 `autosave.ts` saves 500 ms after the last edit, one save at a time, and reports
-Saved, Saving, or Not saved with the reason.
+Saved, Saving, or Not saved with the reason. `ui/saveStatus.ts` turns a failing
+save into one notice rather than one per retry. While saves fail, Not saved shows
+on phones too, the browser asks before the tab closes, and the editor asks before
+going back to the library. Images that storage refuses stay in memory under the
+same id (`Actions.storeAsset`): they still show, a saved .cheatsheet file still
+contains them, and every autosave tries to store them again.
 
 ### platform
 
@@ -101,7 +106,10 @@ inspector do.
 
 `vite build` produces the web app with a service worker (vite-plugin-pwa) that
 precaches the app, the fonts, MathJax and the pdf.js worker, so it works offline
-after one visit. MathJax's rarely used alphabets are cached when first needed.
+after one visit. That includes MathJax's font files for blackboard bold,
+calligraphic, fraktur, script and typewriter letters and the less common symbols;
+the rest (Cyrillic, Braille, accented letters in formulas) are cached when first
+needed.
 
 `vite build --mode tauri` produces the same app without the service worker for
 Tauri. `app/src-tauri` is a thin Rust shell: the dialog and fs plugins and one
