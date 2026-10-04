@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { strToU8, zipSync } from 'fflate';
-import { FormatError, packCheatsheet, unpackCheatsheet, validateDocument } from './format';
+import { FormatError, MAX_ENTRY_BYTES, packCheatsheet, unpackCheatsheet, validateDocument } from './format';
 import { addAsset, addItems } from './commands';
 import { createDocument, createImageItem, createShapeItem, createStrokeItem, createTextItem } from './factory';
 
@@ -101,4 +101,24 @@ test('a document made now (real millisecond timestamps) survives a save and reop
     expect(back.createdAt).toBe(now);
     expect(back.updatedAt).toBe(now + 60_000);
     expect(() => validateDocument({ ...doc, createdAt: -1 })).toThrow(FormatError);
+});
+
+test('a file that inflates to an enormous size is refused before it is unpacked', () => {
+    const doc = createDocument('Bomb', 0);
+    // Zeros compress about a thousandfold, so a small file can carry a huge entry.
+    const zip = zipSync({
+        'document.json': strToU8(JSON.stringify(doc)),
+        'assets/padding.png': [new Uint8Array(MAX_ENTRY_BYTES + 1), { level: 1 }],
+    });
+    expect(zip.length).toBeLessThan(MAX_ENTRY_BYTES / 100);
+    expect(() => unpackCheatsheet(zip)).toThrow(/too large/);
+});
+
+test('files the format does not use are not unpacked at all', () => {
+    const doc = createDocument('Extra', 0);
+    const zip = zipSync({
+        'document.json': strToU8(JSON.stringify(doc)),
+        'notes/huge.bin': [new Uint8Array(MAX_ENTRY_BYTES + 1), { level: 1 }],
+    });
+    expect(unpackCheatsheet(zip).doc.title).toBe('Extra');
 });

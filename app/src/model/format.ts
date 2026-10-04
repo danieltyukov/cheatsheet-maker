@@ -149,6 +149,15 @@ export function validateDocument(json: unknown): CheatDocument {
     };
 }
 
+/**
+ * Unpacking limits. Zip entries can compress a thousandfold, so a small file could otherwise
+ * inflate into gigabytes and take the tab down. Real documents stay far below these: images
+ * are at most 4096 px on a side, and PDF pages are rasterised at 300 DPI or less.
+ */
+export const MAX_ENTRY_BYTES = 96 * 1024 * 1024;
+export const MAX_TOTAL_BYTES = 512 * 1024 * 1024;
+const ASSET_PATH = /^assets\/([0-9a-z]+)\.([a-z]+)$/;
+
 export function packCheatsheet(doc: CheatDocument, assets: AssetBytes): Uint8Array {
     const files: Zippable = { 'document.json': [strToU8(JSON.stringify(doc)), { level: 6 }] };
     for (const id of referencedAssetIds(doc)) {
@@ -161,11 +170,23 @@ export function packCheatsheet(doc: CheatDocument, assets: AssetBytes): Uint8Arr
 
 export function unpackCheatsheet(bytes: Uint8Array): { doc: CheatDocument; assets: AssetBytes } {
     let files: Record<string, Uint8Array>;
+    // Only document.json and images are unpacked, and only while they fit the limits. The sizes
+    // checked are the ones the archive declares; fflate never writes past a declared size.
+    let total = 0;
+    let tooLarge = false;
     try {
-        files = unzipSync(bytes);
+        files = unzipSync(bytes, {
+            filter: (f) => {
+                if (f.name !== 'document.json' && !ASSET_PATH.test(f.name)) return false;
+                total += f.originalSize;
+                if (f.originalSize > MAX_ENTRY_BYTES || total > MAX_TOTAL_BYTES) tooLarge = true;
+                return !tooLarge;
+            },
+        });
     } catch {
         throw new FormatError('This is not a Cheatsheet Maker file.');
     }
+    if (tooLarge) throw new FormatError('This file is too large to open: its contents unpack to more than this app can hold.');
     const raw = files['document.json'];
     if (!raw) throw new FormatError('This is not a Cheatsheet Maker file: document.json is missing.');
     let json: unknown;
@@ -177,7 +198,7 @@ export function unpackCheatsheet(bytes: Uint8Array): { doc: CheatDocument; asset
     const doc = validateDocument(json);
     const assets: AssetBytes = new Map();
     for (const [name, data] of Object.entries(files)) {
-        const m = /^assets\/([0-9a-z]+)\.([a-z]+)$/.exec(name);
+        const m = ASSET_PATH.exec(name);
         if (m) assets.set(m[1], { bytes: data, mime: MIME[m[2]] ?? 'application/octet-stream' });
     }
     for (const id of referencedAssetIds(doc)) {
