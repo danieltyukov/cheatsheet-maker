@@ -11,3 +11,7 @@ site/playwright-report/
 *.log
 .DS_Store
 .playwright-mcp/
+
+# Android signing material never lives in the repository.
+*.jks
+*.keystore
