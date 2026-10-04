@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Cheatsheet Maker</title>
+    <meta name="description" content="Turn screenshots, lecture slides, notes and formulas into a dense, printable cheatsheet. Free and open source, for the web, Windows, macOS, Linux and Android." />
+    <meta name="theme-color" content="#eef0f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#10141c" media="(prefers-color-scheme: dark)" />
+    <meta property="og:title" content="Cheatsheet Maker" />
+    <meta property="og:description" content="Every formula, slide and screenshot you need, on one printable page." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://danieltyukov.github.io/cheatsheet-maker/" />
+    <meta property="og:image" content="https://danieltyukov.github.io/cheatsheet-maker/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <script>
+      try {
+        var t = localStorage.getItem('cm-theme');
+        if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-head">
+      <div class="wrap head-row">
+        <a class="brand" href="./" aria-label="Cheatsheet Maker home">
+          <img src="./favicon.svg" alt="" width="32" height="32" />
+          <span>Cheatsheet Maker</span>
+        </a>
+        <nav aria-label="Site">
+          <a href="#features">Features</a>
+          <a href="#install">Install</a>
+          <a href="#privacy">Privacy</a>
+          <a href="https://github.com/danieltyukov/cheatsheet-maker">GitHub</a>
+          <button type="button" class="theme" data-theme-toggle aria-pressed="false" aria-label="Switch to the dark theme">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="sun" d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M12 2v2 M12 20v2 M4.9 4.9l1.4 1.4 M17.7 17.7l1.4 1.4 M2 12h2 M20 12h2 M4.9 19.1l1.4-1.4 M17.7 6.3l1.4-1.4"/><path class="moon" d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero wrap">
+        <div class="hero-copy">
+          <h1>Every formula, slide and screenshot you need, on one printable page.</h1>
+          <p class="lede">
+            Paste screenshots, cut regions straight out of lecture PDFs, type notes and LaTeX, then
+            let auto-pack fit everything onto the page. Export a PDF and print it. Free, open source,
+            and your work never leaves your device.
+          </p>
+          <div class="cta">
+            <a class="btn btn-primary" href="./app/">Open the web app</a>
+            <a class="btn" data-download href="#install">Download</a>
+          </div>
+          <p class="also">Runs in any modern browser and installs from it. Native apps for <a href="#install">Windows, macOS, Linux and Android</a>.</p>
+        </div>
+        <figure class="hero-shot">
+          <picture>
+            <source media="(prefers-color-scheme: dark)" srcset="../docs/img/editor-dark.webp" />
+            <img src="../docs/img/editor-light.webp" width="2880" height="1800" alt="The Cheatsheet Maker editor with a Signals and Systems sheet: a Bode plot, a step response and a pole-zero map packed next to text boxes of typeset formulas, with the page thumbnails on the left and page settings on the right." />
+          </picture>
+        </figure>
+      </section>
+
+      <section id="features" class="features">
+        <div class="wrap">
+          <h2>What it does</h2>
+          <p class="section-lede">Built for the night before the exam, when the allowed sheet is one page and everything has to fit.</p>
+          <div class="sheet">
+            <article class="box">
+              <h3>Paste, crop, done</h3>
+              <p>Paste a screenshot with Ctrl+V or drop image files on the page. Double-click to crop; the rest of the image stays there, so you can widen the crop again later.</p>
+            </article>
+            <article class="box">
+              <h3>Slides straight from the PDF</h3>
+              <p>Open a lecture PDF, flip to the slide, drag a box around the derivation you need and add it. Each box becomes a sharp image at the resolution you choose.</p>
+            </article>
+            <article class="box box-tall">
+              <h3>Formulas that typeset</h3>
+              <p>Text boxes take light Markdown and LaTeX: <code>$\frac{a}{b}$</code> inline, <code>$$...$$</code> for a centred formula, bullet lists, bold and code. Rendered by MathJax, so it looks like the textbook.</p>
+            </article>
+            <article class="box">
+              <h3>Auto-pack</h3>
+              <p>One click rearranges the page so nothing overlaps. Fill the page scales everything up as far as it fits; keep sizes packs tightly and spills onto a new page.</p>
+            </article>
+            <article class="box">
+              <h3>Ink saver</h3>
+              <p>Turn white backgrounds transparent, invert dark-theme slides, go grayscale, raise the contrast, or trim the empty margins off a screenshot in one click.</p>
+            </article>
+            <article class="box">
+              <h3>Draw and highlight</h3>
+              <p>Pen with pressure for stylus and Apple Pencil, a real highlighter that multiplies over the ink, arrows, boxes and an eraser for strokes.</p>
+            </article>
+            <article class="box">
+              <h3>Print check</h3>
+              <p>Before you print, it lists images that will come out below 150 DPI and text smaller than 5 pt, and shows the page at its real size.</p>
+            </article>
+            <article class="box">
+              <h3>Exact layout tools</h3>
+              <p>Snap guides, a grid, column guides, rotation, align and distribute, layers, and page sizes from A5 to A3 in either orientation.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="steps wrap" aria-labelledby="how">
+        <h2 id="how">How a sheet comes together</h2>
+        <ol>
+          <li><strong>Collect.</strong> Paste screenshots, add regions from the lecture PDFs and type the formulas you keep forgetting.</li>
+          <li><strong>Arrange.</strong> Auto-pack the page, nudge what matters to the top, highlight the traps.</li>
+          <li><strong>Print.</strong> Run the print check, export a PDF and print it at 100%.</li>
+        </ol>
+      </section>
+
+      <section class="phone wrap">
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset="../docs/img/phone-dark.webp" />
+          <img src="../docs/img/phone.webp" width="1170" height="2532" alt="The same cheatsheet on a phone, with the drawing tools along the bottom of the screen." loading="lazy" />
+        </picture>
+        <div>
+          <h2>On your phone as well</h2>
+          <p>The layout changes for small screens: tools along the bottom, pages and settings in sheets you pull up. Draw with a finger or a stylus, pinch to zoom, and take a photo of the whiteboard straight onto the page.</p>
+          <p>Install it from the browser on any phone, or get the Android app from the releases page.</p>
+        </div>
+      </section>
+
+      <section id="install" class="install">
+        <div class="wrap">
+          <h2>Install</h2>
+          <p class="section-lede">The web app needs nothing installed and works offline after the first visit. The native apps are the same editor with native save dialogs.</p>
+          <div class="platforms">
+            <article>
+              <h3>Web</h3>
+              <p>Open <a href="./app/">the web app</a> in Chrome, Edge, Firefox or Safari. In Chrome and Edge, the install button in the address bar adds it to your apps.</p>
+            </article>
+            <article>
+              <h3>Windows</h3>
+              <p><a href="https://github.com/danieltyukov/cheatsheet-maker/releases/latest/download/CheatsheetMaker_x64-setup.exe"><code>CheatsheetMaker_x64-setup.exe</code></a> installs for your user only. It is not code-signed, so SmartScreen asks once: More info, then Run anyway. An <code>.msi</code> is there too.</p>
+            </article>
+            <article>
+              <h3>macOS</h3>
+              <p><a href="https://github.com/danieltyukov/cheatsheet-maker/releases/latest/download/CheatsheetMaker_universal.dmg"><code>CheatsheetMaker_universal.dmg</code></a> runs on Apple silicon and Intel. It is not notarised: the first time, right-click the app and choose Open.</p>
+            </article>
+            <article>
+              <h3>Linux</h3>
+              <p><a href="https://github.com/danieltyukov/cheatsheet-maker/releases/latest/download/cheatsheet-maker_x86_64.AppImage"><code>cheatsheet-maker_x86_64.AppImage</code></a> runs anywhere after <code>chmod +x</code>. On Debian and Ubuntu, <code>sudo apt install ./cheatsheet-maker_amd64.deb</code>.</p>
+            </article>
+            <article>
+              <h3>Android</h3>
+              <p><a href="https://github.com/danieltyukov/cheatsheet-maker/releases/latest/download/cheatsheet-maker.apk"><code>cheatsheet-maker.apk</code></a> for Android 7 and newer. Your browser asks once to allow installing apps from it.</p>
+            </article>
+            <article id="install-ios">
+              <h3>iPhone and iPad</h3>
+              <p>Open <a href="./app/">the web app</a> in Safari, tap Share, then Add to Home Screen. It opens full screen and works offline.</p>
+            </article>
+          </div>
+          <p class="all-downloads">Every file, with checksums: <a href="https://github.com/danieltyukov/cheatsheet-maker/releases/latest">latest release</a>.</p>
+        </div>
+      </section>
+
+      <section id="privacy" class="privacy wrap">
+        <h2>Your sheets never leave your device</h2>
+        <p>Everything you make is stored in your browser or in the app on your device. There is no account, no server, no analytics and no cookies. To move a sheet to another device, save a <code>.cheatsheet</code> file and open it there. The <a href="./privacy.html">privacy page</a> has the details.</p>
+      </section>
+
+      <section class="faq wrap" aria-labelledby="faq">
+        <h2 id="faq">Questions</h2>
+        <details>
+          <summary>What is a .cheatsheet file?</summary>
+          <p>A zip with the document as JSON and every image in it, so a sheet is one file you can back up, send or open on another device. The format is documented in the repository.</p>
+        </details>
+        <details>
+          <summary>How do I make the text as small as possible and still readable?</summary>
+          <p>Use the Narrow font for density and Sans (Atkinson Hyperlegible) when legibility matters. Run the print check: it warns below 5 pt. Print at 100% scale, not "fit to page".</p>
+        </details>
+        <details>
+          <summary>I used the old Linux version. Where is my sheet?</summary>
+          <p>The desktop app finds the old autosave and offers to import it. On any other platform, open <code>~/.config/cheatsheet-maker/autosave.json</code> with Open file on the library screen.</p>
+        </details>
+        <details>
+          <summary>Can I help?</summary>
+          <p>Yes. Issues and pull requests are welcome on <a href="https://github.com/danieltyukov/cheatsheet-maker">GitHub</a>; the contributing guide explains the layout of the code and how to run the tests.</p>
+        </details>
+      </section>
+    </main>
+
+    <footer class="site-foot">
+      <div class="wrap foot-row">
+        <p><a href="https://github.com/danieltyukov/cheatsheet-maker">Source on GitHub</a>, MIT licence. <a href="./privacy.html">Privacy</a>.</p>
+        <p class="fine">Fonts: Atkinson Hyperlegible Next, Archivo Narrow, Source Serif 4, JetBrains Mono and Bricolage Grotesque, all under the SIL Open Font License. No third-party requests, no cookies.</p>
+      </div>
+    </footer>
+  </body>
+</html>

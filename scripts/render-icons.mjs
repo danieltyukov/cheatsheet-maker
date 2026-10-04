@@ -28,4 +28,9 @@ png(maskablePath, 512, join(root, 'app/public/icons/maskable-512.png'));
 png(master, 180, join(root, 'app/public/icons/apple-touch-icon.png'));
 png(master, 1024, join(root, 'app/src-tauri/icon-1024.png'));
 copyFileSync(master, join(root, 'app/public/favicon.svg'));
+// Website: favicon, touch icon and the 1200 x 630 social preview.
+mkdirSync(join(root, 'site/public'), { recursive: true });
+copyFileSync(master, join(root, 'site/public/favicon.svg'));
+png(master, 180, join(root, 'site/public/apple-touch-icon.png'));
+execFileSync('rsvg-convert', ['-w', '1200', '-h', '630', join(root, 'site/og.svg'), '-o', join(root, 'site/public/og.png')]);
 console.log('Icons rendered. Next: cd app && npx tauri icon src-tauri/icon-1024.png');

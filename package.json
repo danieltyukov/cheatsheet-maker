@@ -2,14 +2,18 @@
   "name": "cheatsheet-maker",
   "private": true,
   "type": "module",
-  "workspaces": ["app", "site"],
+  "workspaces": [
+    "app",
+    "site"
+  ],
   "scripts": {
     "dev": "npm run dev -w app",
     "build": "npm run build -w app",
     "test": "vitest run",
     "test:e2e": "npm run e2e -w app",
     "typecheck": "tsc --noEmit -p app",
-    "tauri": "npm run tauri -w app --"
+    "tauri": "npm run tauri -w app --",
+    "site": "npm run dev -w site"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
