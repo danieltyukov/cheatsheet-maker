@@ -97,7 +97,8 @@ function flow(tokens: Token[], x0: number, avail: number, y: number, base: FontS
             queue.unshift(t);
             continue;
         }
-        if (t.kind === 'text' && !t.space && t.w > avail + 1e-9) {
+        // A single character that is still too wide is placed anyway; splitting it again would loop forever.
+        if (t.kind === 'text' && !t.space && t.w > avail + 1e-9 && [...t.text].length > 1) {
             queue.unshift(...hardBreak(t, avail, o));
             continue;
         }

@@ -47,3 +47,8 @@ describe('layoutText', () => {
         expect(texts(out.runs)[0].font).toMatchObject({ bold: true, size: 14 });
     });
 });
+
+test('a box narrower than one character still lays out (one character per line)', () => {
+    const out = layoutText(parseMarkdown('ab'), opts({ width: 2 }));
+    expect(texts(out.runs).map((r) => r.text)).toEqual(['a', 'b']);
+}, 2000);
