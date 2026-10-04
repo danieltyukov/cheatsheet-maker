@@ -33,7 +33,10 @@ async function renderInto(page: PDFPageProxy, scale: number, canvas: HTMLCanvasE
     const viewport = page.getViewport({ scale });
     canvas.width = Math.max(1, Math.floor(viewport.width));
     canvas.height = Math.max(1, Math.floor(viewport.height));
-    await page.render({ canvas, viewport }).promise;
+    // Draw into this canvas's own 2D context so the pixels are ours to encode right after.
+    const canvasContext = canvas.getContext('2d');
+    if (!canvasContext) throw new Error('This browser cannot draw the PDF page.');
+    await page.render({ canvas, canvasContext, viewport }).promise;
 }
 
 function Thumb({ pdf, n, active, count, onPick }: { pdf: PDFDocumentProxy; n: number; active: boolean; count: number; onPick: () => void }) {

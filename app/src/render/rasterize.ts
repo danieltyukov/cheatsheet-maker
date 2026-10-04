@@ -5,23 +5,33 @@ import { filtersKey } from './filters';
 
 export type AnyCanvas = HTMLCanvasElement | OffscreenCanvas;
 
+/**
+ * A canvas element on the main thread, an OffscreenCanvas only where there is no document.
+ * Chromium's asynchronous encoders (toBlob, convertToBlob) can defer the work by several
+ * seconds while waiting for idle time, so main-thread canvases are encoded synchronously.
+ */
 export function createCanvas(w: number, h: number): AnyCanvas {
     const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
-    if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(W, H);
+    if (typeof document === 'undefined' && typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(W, H);
     const c = document.createElement('canvas');
     c.width = W;
     c.height = H;
     return c;
 }
 
-export async function canvasToBlob(canvas: AnyCanvas, type = 'image/png', quality?: number): Promise<Blob> {
-    if ('convertToBlob' in canvas) return canvas.convertToBlob({ type, quality });
-    return new Promise((resolve, reject) =>
-        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('The browser could not encode the image.'))), type, quality));
+function dataUrlBytes(url: string): Uint8Array {
+    const comma = url.indexOf(',');
+    if (comma < 0 || url === 'data:,') throw new Error('The browser could not encode the image.');
+    return Uint8Array.from(atob(url.slice(comma + 1)), (c) => c.charCodeAt(0));
 }
 
 export async function canvasToBytes(canvas: AnyCanvas, type = 'image/png', quality?: number): Promise<Uint8Array> {
-    return new Uint8Array(await (await canvasToBlob(canvas, type, quality)).arrayBuffer());
+    if ('convertToBlob' in canvas) return new Uint8Array(await (await canvas.convertToBlob({ type, quality })).arrayBuffer());
+    return dataUrlBytes(canvas.toDataURL(type, quality));
+}
+
+export async function canvasToBlob(canvas: AnyCanvas, type = 'image/png', quality?: number): Promise<Blob> {
+    return new Blob([(await canvasToBytes(canvas, type, quality)) as Uint8Array<ArrayBuffer>], { type });
 }
 
 function hasTransparency(ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D, w: number, h: number): boolean {
