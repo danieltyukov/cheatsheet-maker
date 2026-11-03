@@ -23,5 +23,6 @@ beforeAll(() => {
 test('storage that fails after opening still lands in a working editor that says it is not saving', async () => {
     render(<App />);
     expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Untitled cheatsheet');
-    expect(screen.getByRole('button', { name: /Not saved/ })).toHaveAttribute('title', expect.stringContaining('not letting the app store anything'));
+    // The status comes from the save reporter, which the editor starts in an effect after its first render.
+    expect(await screen.findByRole('button', { name: /Not saved/ })).toHaveAttribute('title', expect.stringContaining('not letting the app store anything'));
 });
